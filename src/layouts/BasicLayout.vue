@@ -1,0 +1,310 @@
+<template>
+    <div class="layout-container">
+        <!-- 侧边栏 -->
+        <aside class="sidebar" :class="{ collapsed: sidebarCollapsed }">
+            <div class="logo">
+                <span v-if="!sidebarCollapsed">同城任务</span>
+                <span v-else>任</span>
+            </div>
+            <nav class="menu">
+                <template v-for="item in menuList" :key="item.path">
+                    <!-- 一级菜单 -->
+                    <div v-if="item.children && item.children.length > 0" class="menu-group">
+                        <div class="menu-item group-title" @click="toggleGroup(item.path)">
+                            <el-icon class="icon" :size="20">
+                                <component :is="item.icon" />
+                            </el-icon>
+                            <span v-if="!sidebarCollapsed" class="menu-name">{{ item.name }}</span>
+                            <el-icon v-if="!sidebarCollapsed" class="arrow"
+                                :class="{ rotated: expandedGroups.includes(item.path) }">
+                                <ArrowRight />
+                            </el-icon>
+                        </div>
+                        <!-- 子菜单 -->
+                        <div v-show="!sidebarCollapsed && expandedGroups.includes(item.path)" class="submenu">
+                            <router-link v-for="child in item.children" :key="child.path" :to="child.path"
+                                class="menu-item submenu-item" active-class="active">
+                                <el-icon class="icon" :size="18">
+                                    <component :is="child.icon" />
+                                </el-icon>
+                                <span class="menu-name">{{ child.name }}</span>
+                            </router-link>
+                        </div>
+                    </div>
+                    <!-- 无子菜单 -->
+                    <router-link v-else :to="item.path" class="menu-item" active-class="active">
+                        <el-icon class="icon" :size="20">
+                            <component :is="item.icon" />
+                        </el-icon>
+                        <span v-if="!sidebarCollapsed" class="menu-name">{{ item.name }}</span>
+                    </router-link>
+                </template>
+            </nav>
+        </aside>
+
+        <!-- 主内容区 -->
+        <div class="main-container" :class="{ collapsed: sidebarCollapsed }">
+            <!-- 顶部导航 -->
+            <header class="header">
+                <el-button class="toggle-btn" @click="toggleSidebar" link>
+                    <el-icon :size="20">
+                        <Fold v-if="!sidebarCollapsed" />
+                        <Expand v-else />
+                    </el-icon>
+                </el-button>
+                <div class="header-right">
+                    <el-avatar :size="32" icon="UserFilled" />
+                    <span class="username">管理员</span>
+                </div>
+            </header>
+
+            <!-- 标签页 -->
+            <TagsView />
+
+            <!-- 内容区域 -->
+            <main class="content">
+                <router-view />
+            </main>
+        </div>
+    </div>
+</template>
+
+<script>
+import menuConfig from '@/config/menuConfig.js'
+import TagsView from '@/components/TagsView.vue'
+import { Fold, Expand, ArrowRight } from '@element-plus/icons-vue'
+
+export default {
+    name: 'BasicLayout',
+    components: {
+        TagsView,
+        Fold,
+        Expand,
+        ArrowRight
+    },
+    data() {
+        return {
+            sidebarCollapsed: false,
+            menuList: menuConfig,
+            expandedGroups: ['trade'] // 默认展开交易集市
+        }
+    },
+    methods: {
+        toggleSidebar() {
+            this.sidebarCollapsed = !this.sidebarCollapsed
+        },
+        toggleGroup(path) {
+            const index = this.expandedGroups.indexOf(path)
+            if (index > -1) {
+                this.expandedGroups.splice(index, 1)
+            } else {
+                this.expandedGroups.push(path)
+            }
+        }
+    }
+}
+</script>
+
+<style scoped>
+.layout-container {
+    display: flex;
+    height: 100vh;
+    overflow: hidden;
+}
+
+.sidebar {
+    width: 240px;
+    background: linear-gradient(180deg, #1a1c2e 0%, #2d3142 100%);
+    transition: width 0.3s ease;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 2px 0 8px rgba(0, 0, 0, 0.15);
+}
+
+.sidebar.collapsed {
+    width: 64px;
+}
+
+.logo {
+    height: 64px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 1.5rem;
+    font-weight: bold;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    background: rgba(0, 0, 0, 0.2);
+}
+
+.menu {
+    padding: 8px 0;
+    overflow-y: auto;
+    flex: 1;
+}
+
+.menu::-webkit-scrollbar {
+    width: 4px;
+}
+
+.menu::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 2px;
+}
+
+.menu-item {
+    display: flex;
+    align-items: center;
+    padding: 14px 24px;
+    margin: 4px 8px;
+    color: rgba(255, 255, 255, 0.7);
+    text-decoration: none;
+    transition: all 0.3s;
+    cursor: pointer;
+    border-radius: 8px;
+    position: relative;
+}
+
+.menu-item:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: white;
+    transform: translateX(4px);
+}
+
+.menu-item.active {
+    background: linear-gradient(90deg, rgba(102, 126, 234, 0.4) 0%, rgba(102, 126, 234, 0.1) 100%);
+    color: #667eea;
+    font-weight: 500;
+}
+
+.menu-item.active::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 3px;
+    height: 60%;
+    background: #667eea;
+    border-radius: 0 2px 2px 0;
+}
+
+.icon {
+    margin-right: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: margin 0.3s;
+    color: currentColor;
+}
+
+.menu-name {
+    white-space: nowrap;
+    opacity: 1;
+    transition: opacity 0.3s;
+    flex: 1;
+}
+
+.group-title {
+    justify-content: space-between;
+}
+
+.group-title .arrow {
+    transition: transform 0.3s;
+}
+
+.group-title .arrow.rotated {
+    transform: rotate(90deg);
+}
+
+.submenu {
+    padding-left: 20px;
+}
+
+.submenu-item {
+    padding-left: 44px;
+    font-size: 0.95rem;
+}
+
+.submenu-item .icon {
+    font-size: 1.1rem;
+}
+
+.sidebar.collapsed .menu-item {
+    justify-content: center;
+    padding: 14px;
+    margin: 4px 8px;
+}
+
+.sidebar.collapsed .icon {
+    margin-right: 0;
+}
+
+.sidebar.collapsed .menu-name {
+    display: none;
+}
+
+.sidebar.collapsed .menu-item.active::before {
+    height: 60%;
+    left: 50%;
+    transform: translateX(-50%) translateY(-50%);
+    width: 60%;
+    border-radius: 2px;
+}
+
+.main-container {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.header {
+    height: 64px;
+    background: white;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 24px;
+    z-index: 10;
+}
+
+.toggle-btn {
+    padding: 4px 8px;
+    border-radius: 4px;
+    transition: background 0.3s;
+    color: #333;
+}
+
+.toggle-btn:hover {
+    background: #f5f5f5;
+}
+
+.header-right {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.username {
+    color: #666;
+    font-size: 0.95rem;
+}
+
+.content {
+    flex: 1;
+    overflow-y: auto;
+    background: #f0f2f5;
+    padding: 24px;
+}
+
+.content::-webkit-scrollbar {
+    width: 6px;
+}
+
+.content::-webkit-scrollbar-thumb {
+    background: #ccc;
+    border-radius: 3px;
+}
+</style>

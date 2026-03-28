@@ -1,0 +1,76 @@
+/**
+ * 侧边栏菜单配置
+ * path: 路由路径
+ * name: 菜单名称
+ * icon: 菜单图标（使用 Element Plus Icons 组件名）
+ * children: 子菜单（可选）
+ */
+export default [
+  {
+    path: '/',
+    name: '首页',
+    icon: 'HomeFilled'
+  },
+  {
+    path: '/trade',
+    name: '交易集市',
+    icon: 'ShoppingCart',
+    children: [
+      {
+        path: '/trade/publish',
+        name: '交易发布',
+        icon: 'EditPen'
+      },
+      {
+        path: '/trade/list',
+        name: '交易大全',
+        icon: 'List'
+      },
+      {
+        path: '/trade/order',
+        name: '订单大全',
+        icon: 'Document'
+      }
+    ]
+  },
+  {
+    path: '/chat',
+    name: '聊天室',
+    icon: 'ChatDotRound'
+  },
+  {
+    path: '/user',
+    name: '用户管理',
+    icon: 'User'
+  },
+  {
+    path: '/role',
+    name: '角色管理',
+    icon: 'Avatar'
+  },
+  {
+    path: '/menu',
+    name: '菜单管理',
+    icon: 'Menu'
+  },
+  {
+    path: '/dict',
+    name: '字典管理',
+    icon: 'Collection'
+  },
+  {
+    path: '/notice',
+    name: '通知公告',
+    icon: 'Bell'
+  },
+  {
+    path: '/log',
+    name: '日志管理',
+    icon: 'Notebook'
+  },
+  {
+    path: '/setting',
+    name: '系统设置',
+    icon: 'Setting'
+  }
+]
