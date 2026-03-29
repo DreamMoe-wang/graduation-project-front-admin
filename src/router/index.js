@@ -1,4 +1,4 @@
-import { createRouter, createWebHistory } from 'vue-router'
+﻿import { createRouter, createWebHistory } from 'vue-router'
 import BasicLayout from '@/layouts/BasicLayout.vue'
 
 const routes = [

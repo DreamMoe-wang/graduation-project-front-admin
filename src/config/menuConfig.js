@@ -1,9 +1,5 @@
-/**
+﻿/**
  * 侧边栏菜单配置
- * path: 路由路径
- * name: 菜单名称
- * icon: 菜单图标（使用 Element Plus Icons 组件名）
- * children: 子菜单（可选）
  */
 export default [
   {
