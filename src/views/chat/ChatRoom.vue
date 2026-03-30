@@ -1,36 +1,48 @@
 <template>
     <div class="chat-room">
-        <div class="page-header">
-            <h2>聊天室</h2>
-            <p>与任务发布者/服务提供者在线沟通</p>
-        </div>
-
         <el-card class="chat-card">
             <div class="chat-container">
                 <!-- 左侧会话列表 -->
                 <div class="chat-sidebar">
                     <div class="search-box">
-                        <el-input v-model="searchKeyword" placeholder="搜索聊天记录" prefix-icon="Search" size="default"
-                            clearable />
+                        <el-input
+                            v-model="searchKeyword"
+                            placeholder="搜索聊天记录"
+                            :prefix-icon="Search"
+                            size="default"
+                            clearable
+                        />
                     </div>
-                    <div class="session-list">
-                        <div v-for="item in sessionList" :key="item.id" class="session-item"
-                            :class="{ active: currentSessionId === item.id }" @click="selectSession(item)">
-                            <el-avatar :size="48" :src="item.avatar" class="avatar">
-                                {{ item.name.charAt(0) }}
-                            </el-avatar>
-                            <div class="session-info">
-                                <div class="session-header">
-                                    <span class="session-name">{{ item.name }}</span>
-                                    <span class="session-time">{{ item.time }}</span>
+                    <div class="session-list" v-loading="loadingSessions">
+                        <template v-if="sessionList.length">
+                            <div
+                                v-for="item in sessionList"
+                                :key="item.id"
+                                class="session-item"
+                                :class="{ active: currentSessionId === item.id }"
+                                @click="selectSession(item)"
+                            >
+                                <el-avatar :size="48" :src="item.avatar" class="avatar">
+                                    {{ getDisplayInitial(item.name) }}
+                                </el-avatar>
+                                <div class="session-info">
+                                    <div class="session-header">
+                                        <span class="session-name">{{ item.name }}</span>
+                                        <span class="session-time">{{ item.time }}</span>
+                                    </div>
+                                    <div class="session-last-msg">
+                                        {{ item.lastMessage }}
+                                    </div>
                                 </div>
-                                <div class="session-last-msg">
-                                    {{ item.lastMessage }}
-                                </div>
+                                <el-badge
+                                    v-if="item.unread > 0"
+                                    :value="item.unread"
+                                    :hidden="item.unread === 0"
+                                    class="unread-badge"
+                                />
                             </div>
-                            <el-badge v-if="item.unread > 0" :value="item.unread" :hidden="item.unread === 0"
-                                class="unread-badge" />
-                        </div>
+                        </template>
+                        <el-empty v-else description="暂无会话" />
                     </div>
                 </div>
 
@@ -41,7 +53,7 @@
                         <div class="chat-header">
                             <div class="chat-user-info">
                                 <el-avatar :size="40" :src="currentSession.avatar">
-                                    {{ currentSession.name.charAt(0) }}
+                                    {{ getDisplayInitial(currentSession.name) }}
                                 </el-avatar>
                                 <div class="user-detail">
                                     <div class="user-name">{{ currentSession.name }}</div>
@@ -49,42 +61,66 @@
                                 </div>
                             </div>
                             <div class="chat-actions">
-                                <el-button circle icon="More" />
+                                <el-button circle @click="refreshCurrentSession">
+                                    <el-icon>
+                                        <RefreshRight />
+                                    </el-icon>
+                                </el-button>
                             </div>
                         </div>
 
                         <!-- 消息列表 -->
-                        <div class="message-list" ref="messageListRef">
-                            <div v-for="msg in messageList" :key="msg.id" class="message-item" :class="msg.type">
-                                <el-avatar v-if="msg.type === 'received'" :size="36" :src="currentSession.avatar"
-                                    class="message-avatar">
-                                    {{ currentSession.name.charAt(0) }}
-                                </el-avatar>
-                                <div class="message-body">
-                                    <div class="message-sender" v-if="msg.type === 'received'">
-                                        {{ currentSession.name }}
+                        <div class="message-list" ref="messageListRef" v-loading="loadingMessages">
+                            <template v-if="messageList.length">
+                                <div v-for="msg in messageList" :key="msg.id" class="message-item" :class="msg.type">
+                                    <el-avatar
+                                        v-if="msg.type === 'received'"
+                                        :size="36"
+                                        :src="currentSession.avatar"
+                                        class="message-avatar"
+                                    >
+                                        {{ getDisplayInitial(currentSession.name) }}
+                                    </el-avatar>
+                                    <div class="message-body">
+                                        <div class="message-sender" v-if="msg.type === 'received'">
+                                            {{ currentSession.name }}
+                                        </div>
+                                        <div class="message-bubble">
+                                            {{ msg.content }}
+                                        </div>
+                                        <div class="message-time">{{ msg.time }}</div>
                                     </div>
-                                    <div class="message-bubble">
-                                        {{ msg.content }}
-                                    </div>
-                                    <div class="message-time">{{ msg.time }}</div>
+                                    <el-avatar v-if="msg.type === 'sent'" :size="36" class="message-avatar">
+                                        我
+                                    </el-avatar>
                                 </div>
-                                <el-avatar v-if="msg.type === 'sent'" :size="36" class="message-avatar">
-                                    我
-                                </el-avatar>
-                            </div>
+                            </template>
+                            <el-empty v-else description="暂无聊天记录" />
                         </div>
 
                         <!-- 输入区域 -->
                         <div class="input-area">
-                            <el-input v-model="messageInput" type="textarea" :rows="3" placeholder="输入消息..."
-                                @keydown.enter.exact.prevent="sendMessage" />
+                            <el-input
+                                v-model="messageInput"
+                                type="textarea"
+                                :rows="3"
+                                placeholder="输入消息..."
+                                @keydown.enter.exact.prevent="sendMessage"
+                            />
                             <div class="input-actions">
                                 <div class="left-actions">
-                                    <el-button text icon="Picture" />
-                                    <el-button text icon="Folder" />
+                                    <el-button text @click="showPlaceholderMessage('图片')">
+                                        <el-icon>
+                                            <Picture />
+                                        </el-icon>
+                                    </el-button>
+                                    <el-button text @click="showPlaceholderMessage('文件')">
+                                        <el-icon>
+                                            <FolderOpened />
+                                        </el-icon>
+                                    </el-button>
                                 </div>
-                                <el-button type="primary" @click="sendMessage">发送</el-button>
+                                <el-button type="primary" :loading="sending" @click="sendMessage">发送</el-button>
                             </div>
                         </div>
                     </div>
@@ -96,46 +132,33 @@
 </template>
 
 <script>
+import { FolderOpened, Picture, RefreshRight, Search } from '@element-plus/icons-vue'
+import {
+    getChatMessages,
+    getChatSessions,
+    markChatSessionRead,
+    sendChatMessage
+} from '@/api/chat'
+
 export default {
     name: 'ChatRoom',
+    components: {
+        Search,
+        RefreshRight,
+        Picture,
+        FolderOpened
+    },
     data() {
         return {
             searchKeyword: '',
             currentSessionId: null,
             messageInput: '',
-            sessionList: [
-                {
-                    id: 1,
-                    name: '张三',
-                    avatar: '',
-                    lastMessage: '好的，我一会儿就到',
-                    time: '10:30',
-                    unread: 2
-                },
-                {
-                    id: 2,
-                    name: '李四',
-                    avatar: '',
-                    lastMessage: '这个任务我可以接',
-                    time: '09:15',
-                    unread: 0
-                },
-                {
-                    id: 3,
-                    name: '王五',
-                    avatar: '',
-                    lastMessage: '谢谢，已经解决了',
-                    time: '昨天',
-                    unread: 0
-                }
-            ],
-            messageList: [
-                { id: 1, type: 'received', content: '你好，请问这个任务还可以接吗？', time: '10:25' },
-                { id: 2, type: 'sent', content: '可以的，你什么时候方便？', time: '10:26' },
-                { id: 3, type: 'received', content: '我下午 2 点以后都可以', time: '10:28' },
-                { id: 4, type: 'sent', content: '好的，那就下午 2 点见', time: '10:29' },
-                { id: 5, type: 'received', content: '好的，我一会儿就到', time: '10:30' }
-            ]
+            sessionList: [],
+            messageList: [],
+            loadingSessions: false,
+            loadingMessages: false,
+            sending: false,
+            searchTimer: null
         }
     },
     computed: {
@@ -143,31 +166,140 @@ export default {
             return this.sessionList.find(item => item.id === this.currentSessionId) || null
         }
     },
+    watch: {
+        searchKeyword() {
+            this.scheduleSessionSearch()
+        }
+    },
+    mounted() {
+        this.fetchSessions(false)
+    },
+    beforeUnmount() {
+        if (this.searchTimer) {
+            clearTimeout(this.searchTimer)
+            this.searchTimer = null
+        }
+    },
     methods: {
-        selectSession(session) {
-            this.currentSessionId = session.id
-            // 清空未读数
-            session.unread = 0
-        },
-        sendMessage() {
-            if (!this.messageInput.trim()) return
+        async fetchSessions(preserveSelection = true) {
+            this.loadingSessions = true
 
-            this.messageList.push({
-                id: Date.now(),
-                type: 'sent',
-                content: this.messageInput,
-                time: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
-            })
+            try {
+                const keyword = this.searchKeyword.trim()
+                const sessions = await getChatSessions(keyword ? { keyword } : {})
+                this.sessionList = Array.isArray(sessions) ? sessions : []
 
-            this.messageInput = ''
-
-            // 滚动到底部
-            this.$nextTick(() => {
-                const container = this.$refs.messageListRef
-                if (container) {
-                    container.scrollTop = container.scrollHeight
+                if (!this.sessionList.length) {
+                    this.currentSessionId = null
+                    this.messageList = []
+                    return
                 }
-            })
+
+                const hasCurrentSession = preserveSelection &&
+                    this.currentSessionId != null &&
+                    this.sessionList.some(item => item.id === this.currentSessionId)
+
+                if (!hasCurrentSession) {
+                    await this.selectSession(this.sessionList[0])
+                }
+            } catch (error) {
+                this.sessionList = []
+                this.currentSessionId = null
+                this.messageList = []
+                console.error('获取会话列表失败:', error)
+            } finally {
+                this.loadingSessions = false
+            }
+        },
+        async selectSession(session) {
+            if (!session) return
+
+            this.currentSessionId = session.id
+
+            try {
+                if (session.unread > 0) {
+                    await markChatSessionRead(session.id)
+                    session.unread = 0
+                }
+
+                await this.fetchMessages(session.id)
+            } catch (error) {
+                console.error('切换会话失败:', error)
+            }
+        },
+        async fetchMessages(sessionId = this.currentSessionId) {
+            if (!sessionId) return
+
+            this.loadingMessages = true
+
+            try {
+                const messages = await getChatMessages(sessionId)
+                this.messageList = Array.isArray(messages) ? messages : []
+
+                this.$nextTick(() => {
+                    this.scrollToBottom()
+                })
+            } catch (error) {
+                this.messageList = []
+                console.error('获取聊天消息失败:', error)
+            } finally {
+                this.loadingMessages = false
+            }
+        },
+        async sendMessage() {
+            const content = this.messageInput.trim()
+
+            if (!content || !this.currentSessionId) return
+
+            this.sending = true
+
+            try {
+                await sendChatMessage(this.currentSessionId, { content })
+                this.messageInput = ''
+
+                await Promise.all([
+                    this.fetchMessages(this.currentSessionId),
+                    this.fetchSessions(true)
+                ])
+            } catch (error) {
+                console.error('发送消息失败:', error)
+            } finally {
+                this.sending = false
+            }
+        },
+        async refreshCurrentSession() {
+            if (!this.currentSessionId) return
+
+            try {
+                await Promise.all([
+                    this.fetchMessages(this.currentSessionId),
+                    this.fetchSessions(true)
+                ])
+            } catch (error) {
+                console.error('刷新会话失败:', error)
+            }
+        },
+        scheduleSessionSearch() {
+            if (this.searchTimer) {
+                clearTimeout(this.searchTimer)
+            }
+
+            this.searchTimer = setTimeout(() => {
+                this.fetchSessions(true)
+            }, 300)
+        },
+        scrollToBottom() {
+            const container = this.$refs.messageListRef
+
+            if (container) {
+                container.scrollTop = container.scrollHeight
+            }
+        },
+        getDisplayInitial(name) {
+            return name ? name.charAt(0) : '?'
+        },
+        showPlaceholderMessage(type) {
+            this.$message.info(`${type}消息功能暂未接入后端接口`)
         }
     }
 }
@@ -176,21 +308,6 @@ export default {
 <style scoped>
 .chat-room {
     padding: 20px;
-}
-
-.page-header {
-    margin-bottom: 24px;
-}
-
-.page-header h2 {
-    font-size: 24px;
-    color: #333;
-    margin-bottom: 8px;
-}
-
-.page-header p {
-    color: #666;
-    font-size: 14px;
 }
 
 .chat-card {

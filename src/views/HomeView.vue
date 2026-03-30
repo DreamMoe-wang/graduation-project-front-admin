@@ -1,6 +1,6 @@
 <template>
     <div class="home-container">
-        <div class="welcome-card">
+        <div class="welcome-card" v-loading="loading">
             <h1 class="welcome-text">你好</h1>
             <p class="subtitle">欢迎来到 Vue3 管理后台系统</p>
             <div class="stats-grid">
@@ -8,28 +8,28 @@
                     <el-icon :size="48" class="stat-icon">
                         <TrendCharts />
                     </el-icon>
-                    <div class="stat-value">0</div>
+                    <div class="stat-value">{{ overview.visitCount }}</div>
                     <div class="stat-label">总访问量</div>
                 </div>
                 <div class="stat-card">
                     <el-icon :size="48" class="stat-icon">
                         <UserFilled />
                     </el-icon>
-                    <div class="stat-value">0</div>
+                    <div class="stat-value">{{ overview.userCount }}</div>
                     <div class="stat-label">用户数</div>
                 </div>
                 <div class="stat-card">
                     <el-icon :size="48" class="stat-icon">
                         <Document />
                     </el-icon>
-                    <div class="stat-value">0</div>
+                    <div class="stat-value">{{ overview.orderCount }}</div>
                     <div class="stat-label">订单数</div>
                 </div>
                 <div class="stat-card">
                     <el-icon :size="48" class="stat-icon">
                         <Money />
                     </el-icon>
-                    <div class="stat-value">¥0</div>
+                    <div class="stat-value">{{ formatAmount(overview.salesAmount) }}</div>
                     <div class="stat-label">销售额</div>
                 </div>
             </div>
@@ -38,8 +38,52 @@
 </template>
 
 <script>
+import { getDashboardOverview } from '@/api/dashboard'
+
 export default {
-    name: 'HomeView'
+    name: 'HomeView',
+    data() {
+        return {
+            loading: false,
+            overview: {
+                visitCount: 0,
+                userCount: 0,
+                orderCount: 0,
+                salesAmount: 0
+            }
+        }
+    },
+    mounted() {
+        this.fetchOverview()
+    },
+    methods: {
+        async fetchOverview() {
+            this.loading = true
+
+            try {
+                const data = await getDashboardOverview()
+                this.overview = {
+                    visitCount: Number(data?.visitCount || 0),
+                    userCount: Number(data?.userCount || 0),
+                    orderCount: Number(data?.orderCount || 0),
+                    salesAmount: Number(data?.salesAmount || 0)
+                }
+            } catch (error) {
+                this.overview = {
+                    visitCount: 0,
+                    userCount: 0,
+                    orderCount: 0,
+                    salesAmount: 0
+                }
+                console.error('获取首页概览失败:', error)
+            } finally {
+                this.loading = false
+            }
+        },
+        formatAmount(amount) {
+            return `¥${Number(amount || 0).toFixed(2)}`
+        }
+    }
 }
 </script>
 

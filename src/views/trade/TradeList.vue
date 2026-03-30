@@ -63,53 +63,56 @@
 
             <!-- 卡片网格 -->
             <div class="card-grid" v-loading="loading">
-                <el-card v-for="item in tableData" :key="item.id" class="trade-card" shadow="hover">
-                    <div class="card-header">
-                        <div class="card-title">{{ item.title }}</div>
-                        <el-tag :type="getStatusType(item.status)" size="small">
-                            {{ getStatusText(item.status) }}
-                        </el-tag>
-                    </div>
+                <template v-if="tableData.length">
+                    <el-card v-for="item in tableData" :key="item.id" class="trade-card" shadow="hover">
+                        <div class="card-header">
+                            <div class="card-title">{{ item.title }}</div>
+                            <el-tag :type="getStatusType(item.status)" size="small">
+                                {{ getStatusText(item.status) }}
+                            </el-tag>
+                        </div>
 
-                    <div class="card-body">
-                        <div class="info-row">
-                            <span class="label">委托人：</span>
-                            <span class="value">{{ item.clientName }}</span>
-                            <span class="phone">{{ item.clientPhone }}</span>
+                        <div class="card-body">
+                            <div class="info-row">
+                                <span class="label">委托人：</span>
+                                <span class="value">{{ item.clientName }}</span>
+                                <span class="phone">{{ item.clientPhone }}</span>
+                            </div>
+                            <div class="info-row">
+                                <span class="label">接单人：</span>
+                                <span class="value">{{ item.workerName || '暂无' }}</span>
+                                <span class="phone" v-if="item.workerPhone">{{ item.workerPhone }}</span>
+                            </div>
+                            <div class="info-row">
+                                <span class="label">发布时间：</span>
+                                <span class="value">{{ item.createTime }}</span>
+                            </div>
+                            <div class="info-row">
+                                <span class="label">备注：</span>
+                                <span class="value desc">{{ item.description || '无' }}</span>
+                            </div>
                         </div>
-                        <div class="info-row">
-                            <span class="label">接单人：</span>
-                            <span class="value">{{ item.workerName || '暂无' }}</span>
-                            <span class="phone" v-if="item.workerPhone">{{ item.workerPhone }}</span>
-                        </div>
-                        <div class="info-row">
-                            <span class="label">发布时间：</span>
-                            <span class="value">{{ item.createTime }}</span>
-                        </div>
-                        <div class="info-row">
-                            <span class="label">备注：</span>
-                            <span class="value desc">{{ item.description || '无' }}</span>
-                        </div>
-                    </div>
 
-                    <div class="card-footer">
-                        <div class="amount">
-                            <span class="label">交易金额：</span>
-                            <span class="price">¥{{ formatAmount(item.amount) }}</span>
+                        <div class="card-footer">
+                            <div class="amount">
+                                <span class="label">交易金额：</span>
+                                <span class="price">¥{{ formatAmount(item.amount) }}</span>
+                            </div>
+                            <div class="actions">
+                                <el-button type="primary" size="small" @click="handleViewDetail(item)">
+                                    详情
+                                </el-button>
+                                <el-button type="warning" size="small" @click="handleEdit(item)">
+                                    编辑
+                                </el-button>
+                                <el-button type="danger" size="small" @click="handleDelete(item)">
+                                    删除
+                                </el-button>
+                            </div>
                         </div>
-                        <div class="actions">
-                            <el-button type="primary" size="small" @click="handleViewDetail(item)">
-                                详情
-                            </el-button>
-                            <el-button type="warning" size="small" @click="handleEdit(item)">
-                                编辑
-                            </el-button>
-                            <el-button type="danger" size="small" @click="handleDelete(item)">
-                                删除
-                            </el-button>
-                        </div>
-                    </div>
-                </el-card>
+                    </el-card>
+                </template>
+                <el-empty v-else description="暂无交易数据" />
             </div>
 
             <!-- 分页 -->
@@ -152,6 +155,8 @@
 
 <script>
 import { Search, Refresh, Download } from '@element-plus/icons-vue'
+import { deleteTradePublish } from '@/api/tradePublish'
+import { exportTradeList, getTradeListDetail, getTradeListPage } from '@/api/tradeList'
 
 export default {
     name: 'TradeList',
@@ -191,135 +196,25 @@ export default {
     },
     methods: {
         // 获取数据
-        fetchData() {
+        async fetchData() {
             this.loading = true
-            // TODO: 实际项目中这里调用 API，传递搜索条件和分页参数
-            setTimeout(() => {
-                this.tableData = [
-                    {
-                        id: 1001,
-                        title: '上门维修服务 - 空调清洗',
-                        clientName: '张先生',
-                        clientPhone: '13800138001',
-                        workerName: '李师傅',
-                        workerPhone: '13900139001',
-                        amount: 150.00,
-                        status: 'trading',
-                        createTime: '2024-01-15 10:30:00',
-                        description: '需要清洗两台壁挂式空调'
-                    },
-                    {
-                        id: 1002,
-                        title: '搬家服务 - 小型搬运',
-                        clientName: '王女士',
-                        clientPhone: '13800138002',
-                        workerName: '',
-                        workerPhone: '',
-                        amount: 300.00,
-                        status: 'published',
-                        createTime: '2024-01-16 14:20:00',
-                        description: '一居室搬家，有电梯'
-                    },
-                    {
-                        id: 1003,
-                        title: '家教辅导 - 初中数学',
-                        clientName: '刘先生',
-                        clientPhone: '13800138003',
-                        workerName: '陈老师',
-                        workerPhone: '13900139003',
-                        amount: 200.00,
-                        status: 'trading',
-                        createTime: '2024-01-17 09:00:00',
-                        description: '每周两次，每次两小时'
-                    },
-                    {
-                        id: 1004,
-                        title: '宠物寄养 - 猫咪照顾',
-                        clientName: '赵女士',
-                        clientPhone: '13800138004',
-                        workerName: '',
-                        workerPhone: '',
-                        amount: 100.00,
-                        status: 'auditing',
-                        createTime: '2024-01-18 16:45:00',
-                        description: '春节假期 7 天寄养'
-                    },
-                    {
-                        id: 1005,
-                        title: '代驾服务 - 晚间代驾',
-                        clientName: '孙先生',
-                        clientPhone: '13800138005',
-                        workerName: '周师傅',
-                        workerPhone: '13900139005',
-                        amount: 80.00,
-                        status: 'completed',
-                        createTime: '2024-01-19 20:00:00',
-                        description: '从酒吧到小区'
-                    },
-                    {
-                        id: 1006,
-                        title: '保洁服务 - 深度清洁',
-                        clientName: '吴女士',
-                        clientPhone: '13800138006',
-                        workerName: '',
-                        workerPhone: '',
-                        amount: 250.00,
-                        status: 'draft',
-                        createTime: '2024-01-20 11:30:00',
-                        description: '三居室全屋清洁'
-                    },
-                    {
-                        id: 1007,
-                        title: '电脑维修 - 系统重装',
-                        clientName: '郑先生',
-                        clientPhone: '13800138007',
-                        workerName: '钱工程师',
-                        workerPhone: '13900139007',
-                        amount: 120.00,
-                        status: 'rejected',
-                        createTime: '2024-01-21 13:15:00',
-                        description: '笔记本系统重装，数据备份'
-                    },
-                    {
-                        id: 1008,
-                        title: '管道疏通 - 厨房下水道',
-                        clientName: '冯女士',
-                        clientPhone: '13800138008',
-                        workerName: '刘师傅',
-                        workerPhone: '13900139008',
-                        amount: 180.00,
-                        status: 'trading',
-                        createTime: '2024-01-22 09:30:00',
-                        description: '厨房下水道堵塞'
-                    },
-                    {
-                        id: 1009,
-                        title: '跑腿代购 - 超市采购',
-                        clientName: '陈先生',
-                        clientPhone: '13800138009',
-                        workerName: '',
-                        workerPhone: '',
-                        amount: 50.00,
-                        status: 'published',
-                        createTime: '2024-01-23 15:00:00',
-                        description: '帮忙购买生活用品'
-                    },
-                    {
-                        id: 1010,
-                        title: '汽车保养 - 更换机油',
-                        clientName: '杨先生',
-                        clientPhone: '13800138010',
-                        workerName: '黄技师',
-                        workerPhone: '13900139010',
-                        amount: 380.00,
-                        status: 'completed',
-                        createTime: '2024-01-24 10:00:00',
-                        description: '全合成机油更换'
-                    }
-                ]
-                this.pagination.total = this.tableData.length
+
+            try {
+                const pageData = await getTradeListPage({
+                    ...this.searchForm,
+                    pageNum: this.pagination.currentPage,
+                    pageSize: this.pagination.pageSize
+                })
+
+                this.tableData = pageData?.records || []
+                this.pagination.total = Number(pageData?.total || 0)
+            } catch (error) {
+                this.tableData = []
+                this.pagination.total = 0
+                console.error('获取交易大全列表失败:', error)
+            } finally {
                 this.loading = false
-            }, 500)
+            }
         },
         // 搜索
         handleSearch() {
@@ -339,9 +234,13 @@ export default {
             this.fetchData()
         },
         // 查看详情
-        handleViewDetail(row) {
-            this.currentRow = row
-            this.detailVisible = true
+        async handleViewDetail(row) {
+            try {
+                this.currentRow = await getTradeListDetail(row.id)
+                this.detailVisible = true
+            } catch (error) {
+                console.error('获取交易详情失败:', error)
+            }
         },
         // 编辑
         handleEdit(row) {
@@ -357,37 +256,39 @@ export default {
                 confirmButtonText: '确定',
                 cancelButtonText: '取消',
                 type: 'warning'
-            }).then(() => {
-                // TODO: 调用删除 API
-                console.log('删除:', row.id)
+            }).then(async () => {
+                await deleteTradePublish(row.id)
+
+                if (this.tableData.length === 1 && this.pagination.currentPage > 1) {
+                    this.pagination.currentPage -= 1
+                }
+
                 this.$message.success('删除成功')
-                this.fetchData()
+                await this.fetchData()
             }).catch(() => { })
         },
         // 导出
-        handleExport() {
-            this.$message.info('导出功能开发中...')
-            // TODO: 实现导出功能
+        async handleExport() {
+            try {
+                const data = await exportTradeList(this.searchForm)
+                this.$message.info(data?.message || '导出接口已预留')
+            } catch (error) {
+                console.error('导出交易列表失败:', error)
+            }
         },
         // 分页处理
         handleSizeChange(val) {
-            console.log('每页条数:', val)
+            this.pagination.pageSize = val
+            this.pagination.currentPage = 1
             this.fetchData()
         },
         handleCurrentChange(val) {
-            console.log('当前页码:', val)
-            this.fetchData()
-        },
-        // 排序处理
-        handleSortChange({ prop, order }) {
-            this.sortField = prop
-            this.sortOrder = order
-            console.log('排序:', prop, order)
+            this.pagination.currentPage = val
             this.fetchData()
         },
         // 格式化金额
         formatAmount(amount) {
-            return Number(amount).toFixed(2)
+            return Number(amount || 0).toFixed(2)
         },
         // 获取状态类型
         getStatusType(status) {

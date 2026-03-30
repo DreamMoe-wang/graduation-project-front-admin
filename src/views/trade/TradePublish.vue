@@ -167,17 +167,43 @@
 </template>
 
 <script>
-import { Search, Refresh, Plus, View, Edit, Delete } from '@element-plus/icons-vue'
+import { Search, Refresh, Plus } from '@element-plus/icons-vue'
+import {
+    createTradePublish,
+    deleteTradePublish,
+    getTradePublishDetail,
+    getTradePublishPage,
+    updateTradePublish
+} from '@/api/tradePublish'
+
+function createDefaultFormData() {
+    return {
+        id: null,
+        title: '',
+        clientName: '',
+        clientPhone: '',
+        workerName: '',
+        workerPhone: '',
+        amount: 0,
+        status: 'draft',
+        description: ''
+    }
+}
+
+function normalizeFormData(data = {}) {
+    return {
+        ...createDefaultFormData(),
+        ...data,
+        amount: data.amount != null ? Number(data.amount) : 0
+    }
+}
 
 export default {
     name: 'TradePublish',
     components: {
         Search,
         Refresh,
-        Plus,
-        View,
-        Edit,
-        Delete
+        Plus
     },
     data() {
         return {
@@ -203,17 +229,7 @@ export default {
             submitLoading: false,
             currentRow: null,
             // 表单数据
-            formData: {
-                id: null,
-                title: '',
-                clientName: '',
-                clientPhone: '',
-                workerName: '',
-                workerPhone: '',
-                amount: 0,
-                status: 'draft',
-                description: ''
-            },
+            formData: createDefaultFormData(),
             // 表单验证规则
             formRules: {
                 title: [
@@ -238,106 +254,43 @@ export default {
     },
     mounted() {
         this.fetchData()
+
+        if (this.$route.query.id) {
+            this.openEditDialogById(this.$route.query.id)
+        }
+    },
+    watch: {
+        '$route.query.id'(id) {
+            if (id) {
+                this.openEditDialogById(id)
+            }
+        }
     },
     methods: {
         // 获取数据
-        fetchData() {
+        async fetchData() {
             this.loading = true
-            // TODO: 实际项目中这里调用 API
-            setTimeout(() => {
-                this.tableData = [
-                    {
-                        id: 1,
-                        title: '上门维修服务 - 空调清洗',
-                        clientName: '张先生',
-                        clientPhone: '13800138001',
-                        workerName: '李师傅',
-                        workerPhone: '13900139001',
-                        amount: 150.00,
-                        status: 'trading',
-                        createTime: '2024-01-15 10:30:00',
-                        description: '需要清洗两台壁挂式空调'
-                    },
-                    {
-                        id: 2,
-                        title: '搬家服务 - 小型搬运',
-                        clientName: '王女士',
-                        clientPhone: '13800138002',
-                        workerName: '',
-                        workerPhone: '',
-                        amount: 300.00,
-                        status: 'published',
-                        createTime: '2024-01-16 14:20:00',
-                        description: '一居室搬家，有电梯'
-                    },
-                    {
-                        id: 3,
-                        title: '家教辅导 - 初中数学',
-                        clientName: '刘先生',
-                        clientPhone: '13800138003',
-                        workerName: '陈老师',
-                        workerPhone: '13900139003',
-                        amount: 200.00,
-                        status: 'trading',
-                        createTime: '2024-01-17 09:00:00',
-                        description: '每周两次，每次两小时'
-                    },
-                    {
-                        id: 4,
-                        title: '宠物寄养 - 猫咪照顾',
-                        clientName: '赵女士',
-                        clientPhone: '13800138004',
-                        workerName: '',
-                        workerPhone: '',
-                        amount: 100.00,
-                        status: 'auditing',
-                        createTime: '2024-01-18 16:45:00',
-                        description: '春节假期 7 天寄养'
-                    },
-                    {
-                        id: 5,
-                        title: '代驾服务 - 晚间代驾',
-                        clientName: '孙先生',
-                        clientPhone: '13800138005',
-                        workerName: '周师傅',
-                        workerPhone: '13900139005',
-                        amount: 80.00,
-                        status: 'completed',
-                        createTime: '2024-01-19 20:00:00',
-                        description: '从酒吧到小区'
-                    },
-                    {
-                        id: 6,
-                        title: '保洁服务 - 深度清洁',
-                        clientName: '吴女士',
-                        clientPhone: '13800138006',
-                        workerName: '',
-                        workerPhone: '',
-                        amount: 250.00,
-                        status: 'draft',
-                        createTime: '2024-01-20 11:30:00',
-                        description: '三居室全屋清洁'
-                    },
-                    {
-                        id: 7,
-                        title: '电脑维修 - 系统重装',
-                        clientName: '郑先生',
-                        clientPhone: '13800138007',
-                        workerName: '钱工程师',
-                        workerPhone: '13900139007',
-                        amount: 120.00,
-                        status: 'rejected',
-                        createTime: '2024-01-21 13:15:00',
-                        description: '笔记本系统重装，数据备份'
-                    }
-                ]
-                this.pagination.total = this.tableData.length
+
+            try {
+                const pageData = await getTradePublishPage({
+                    ...this.searchForm,
+                    pageNum: this.pagination.currentPage,
+                    pageSize: this.pagination.pageSize
+                })
+
+                this.tableData = pageData?.records || []
+                this.pagination.total = Number(pageData?.total || 0)
+            } catch (error) {
+                this.tableData = []
+                this.pagination.total = 0
+                console.error('获取交易发布列表失败:', error)
+            } finally {
                 this.loading = false
-            }, 500)
+            }
         },
         // 搜索
         handleSearch() {
-            console.log('搜索条件:', this.searchForm)
+            this.pagination.currentPage = 1
             this.fetchData()
         },
         // 重置
@@ -346,36 +299,32 @@ export default {
                 title: '',
                 status: ''
             }
+            this.pagination.currentPage = 1
             this.fetchData()
         },
         // 添加
         handleAdd() {
+            this.clearEditQuery()
             this.dialogTitle = '发布交易'
             this.isEdit = false
-            this.formData = {
-                id: null,
-                title: '',
-                clientName: '',
-                clientPhone: '',
-                workerName: '',
-                workerPhone: '',
-                amount: 0,
-                status: 'draft',
-                description: ''
-            }
+            this.formData = createDefaultFormData()
             this.dialogVisible = true
+            this.$nextTick(() => {
+                this.$refs.formRef?.clearValidate()
+            })
         },
         // 编辑
         handleEdit(row) {
-            this.dialogTitle = '编辑交易'
-            this.isEdit = true
-            this.formData = { ...row }
-            this.dialogVisible = true
+            this.openEditDialogById(row.id)
         },
         // 查看详情
-        handleViewDetail(row) {
-            this.currentRow = row
-            this.detailVisible = true
+        async handleViewDetail(row) {
+            try {
+                this.currentRow = await getTradePublishDetail(row.id)
+                this.detailVisible = true
+            } catch (error) {
+                console.error('获取交易详情失败:', error)
+            }
         },
         // 删除
         handleDelete(row) {
@@ -383,44 +332,95 @@ export default {
                 confirmButtonText: '确定',
                 cancelButtonText: '取消',
                 type: 'warning'
-            }).then(() => {
-                // TODO: 调用删除 API
-                console.log('删除:', row.id)
+            }).then(async () => {
+                await deleteTradePublish(row.id)
+
+                if (this.tableData.length === 1 && this.pagination.currentPage > 1) {
+                    this.pagination.currentPage -= 1
+                }
+
                 this.$message.success('删除成功')
-                this.fetchData()
+                await this.fetchData()
             }).catch(() => { })
         },
         // 提交表单
         handleSubmit() {
-            this.$refs.formRef.validate((valid) => {
+            this.$refs.formRef.validate(async (valid) => {
                 if (valid) {
                     this.submitLoading = true
-                    // TODO: 调用保存 API
-                    setTimeout(() => {
-                        this.submitLoading = false
-                        this.dialogVisible = false
+
+                    try {
+                        const { id, ...rest } = this.formData
+                        const payload = {
+                            ...rest,
+                            amount: Number(rest.amount || 0)
+                        }
+
+                        if (this.isEdit && this.formData.id) {
+                            await updateTradePublish(this.formData.id, payload)
+                        } else {
+                            await createTradePublish(payload)
+                        }
+
                         this.$message.success(this.isEdit ? '修改成功' : '发布成功')
-                        this.fetchData()
-                    }, 500)
+                        this.dialogVisible = false
+                        this.clearEditQuery()
+                        await this.fetchData()
+                    } catch (error) {
+                        console.error('保存交易失败:', error)
+                    } finally {
+                        this.submitLoading = false
+                    }
                 }
             })
         },
         // 关闭对话框
         handleDialogClose() {
             this.$refs.formRef?.resetFields()
+            this.formData = createDefaultFormData()
+            this.clearEditQuery()
         },
         // 分页处理
         handleSizeChange(val) {
-            console.log('每页条数:', val)
+            this.pagination.pageSize = val
+            this.pagination.currentPage = 1
             this.fetchData()
         },
         handleCurrentChange(val) {
-            console.log('当前页码:', val)
+            this.pagination.currentPage = val
             this.fetchData()
+        },
+        async openEditDialogById(id) {
+            if (!id) return
+
+            try {
+                this.dialogTitle = '编辑交易'
+                this.isEdit = true
+
+                const detail = await getTradePublishDetail(id)
+                this.formData = normalizeFormData(detail)
+                this.dialogVisible = true
+
+                this.$nextTick(() => {
+                    this.$refs.formRef?.clearValidate()
+                })
+            } catch (error) {
+                console.error('打开编辑弹窗失败:', error)
+            }
+        },
+        clearEditQuery() {
+            if (!this.$route.query.id) return
+
+            const query = { ...this.$route.query }
+            delete query.id
+            this.$router.replace({
+                path: this.$route.path,
+                query
+            }).catch(() => { })
         },
         // 格式化金额
         formatAmount(amount) {
-            return `¥${Number(amount).toFixed(2)}`
+            return `¥${Number(amount || 0).toFixed(2)}`
         },
         // 获取状态类型
         getStatusType(status) {
