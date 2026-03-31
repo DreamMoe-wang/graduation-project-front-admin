@@ -1,6 +1,6 @@
 import axios from 'axios'
 import { ElMessage } from 'element-plus'
-import { clearAuthStorage, getToken } from '@/utils/auth'
+import { clearAuthStorage, getToken, isDevBypassToken } from '@/utils/auth'
 
 const defaultBaseURL = process.env.VUE_APP_BASE_API
   || (process.env.NODE_ENV === 'development' ? 'http://localhost:9090/api' : '/api')
@@ -15,7 +15,7 @@ request.interceptors.request.use(
   config => {
     const token = getToken()
 
-    if (token) {
+    if (token && !isDevBypassToken(token)) {
       config.headers = config.headers || {}
       config.headers.Authorization = token.startsWith('Bearer ')
         ? token

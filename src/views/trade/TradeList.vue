@@ -5,12 +5,7 @@
             <el-form :inline="true" :model="searchForm" class="search-form" label-width="80px">
                 <el-form-item label="交易状态">
                     <el-select v-model="searchForm.status" placeholder="请选择状态" clearable style="width: 150px">
-                        <el-option label="草稿" value="draft" />
-                        <el-option label="审核中" value="auditing" />
-                        <el-option label="已发布" value="published" />
-                        <el-option label="未通过" value="rejected" />
-                        <el-option label="交易中" value="trading" />
-                        <el-option label="交易结束" value="completed" />
+                        <el-option v-for="item in statusOptions" :key="item.value" :label="item.label" :value="item.value" />
                     </el-select>
                 </el-form-item>
 
@@ -159,25 +154,9 @@ import { storeToRefs } from 'pinia'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Search, Refresh, Download } from '@element-plus/icons-vue'
+import { getTradeStatusText, getTradeStatusType, TRADE_STATUS_OPTIONS } from '@/config/statusConfig'
+import { formatCurrency } from '@/utils/format'
 import { useTradeListStore } from '@/stores/tradeList'
-
-const TRADE_STATUS_TYPE_MAP = {
-    draft: 'info',
-    auditing: 'warning',
-    published: 'primary',
-    rejected: 'danger',
-    trading: 'success',
-    completed: ''
-}
-
-const TRADE_STATUS_TEXT_MAP = {
-    draft: '草稿',
-    auditing: '审核中',
-    published: '已发布',
-    rejected: '未通过',
-    trading: '交易中',
-    completed: '交易结束'
-}
 
 export default {
     name: 'TradeList',
@@ -216,10 +195,7 @@ export default {
         }
 
         const handleEdit = row => {
-            router.push({
-                path: '/trade/publish',
-                query: { id: row.id }
-            })
+            router.push(`/trade/publish/edit/${row.id}`)
         }
 
         const handleDelete = async row => {
@@ -264,9 +240,9 @@ export default {
             }
         }
 
-        const formatAmount = amount => Number(amount || 0).toFixed(2)
-        const getStatusType = status => TRADE_STATUS_TYPE_MAP[status] || 'info'
-        const getStatusText = status => TRADE_STATUS_TEXT_MAP[status] || status
+        const formatAmount = amount => formatCurrency(amount, { withSymbol: false })
+        const getStatusType = status => getTradeStatusType(status)
+        const getStatusText = status => getTradeStatusText(status)
 
         onMounted(async () => {
             try {
@@ -296,6 +272,7 @@ export default {
             handleSizeChange,
             handleCurrentChange,
             formatAmount,
+            statusOptions: TRADE_STATUS_OPTIONS,
             getStatusType,
             getStatusText
         }

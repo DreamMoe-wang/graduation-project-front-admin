@@ -1,132 +1,261 @@
 <template>
     <div class="login-page">
         <div class="login-background">
-            <div class="bg-orb orb-1"></div>
-            <div class="bg-orb orb-2"></div>
             <div class="bg-grid"></div>
+            <div class="bg-glow glow-top"></div>
+            <div class="bg-glow glow-bottom"></div>
         </div>
 
-        <div class="login-shell">
-            <section class="brand-panel">
-                <div class="brand-badge">Front Admin</div>
-                <h1 class="brand-title">同城任务后台管理系统</h1>
-                <p class="brand-subtitle">
-                    登录后可统一管理交易发布、订单流转、聊天室与系统配置。
-                </p>
-
-                <div class="brand-cards">
-                    <div class="brand-card">
-                        <div class="card-label">默认账号</div>
-                        <div class="card-value">admin</div>
-                    </div>
-                    <div class="brand-card">
-                        <div class="card-label">默认密码</div>
-                        <div class="card-value">admin123</div>
-                    </div>
+        <div class="login-container">
+            <div class="brand-block">
+                <div class="brand-logo">
+                    <img :src="loginLogo" alt="logo" class="logo-image">
                 </div>
-            </section>
+                <h1 class="brand-title">同城任务</h1>
+                <p class="brand-subtitle">高性能同城任务后台管理平台</p>
+            </div>
 
-            <section class="form-panel">
-                <el-card class="login-card" shadow="never">
-                    <div class="card-header">
-                        <h2>欢迎登录</h2>
-                        <p>请输入管理员账号信息</p>
-                    </div>
+            <el-card class="auth-card" shadow="never">
+                <div class="card-header">
+                    <h2>{{ isRegisterMode ? '创建账号' : '欢迎回来' }}</h2>
+                    <p>{{ isRegisterMode ? '注册您的账户以开始使用' : '登录您的账户以继续' }}</p>
+                </div>
 
-                    <el-form
-                        ref="formRef"
-                        :model="form"
-                        :rules="rules"
-                        label-position="top"
-                        class="login-form"
-                    >
-                        <el-form-item label="用户名" prop="username">
-                            <el-input
-                                v-model="form.username"
-                                :prefix-icon="User"
-                                placeholder="请输入用户名"
-                                size="large"
-                                @keyup.enter="handleLogin"
-                            />
-                        </el-form-item>
-
-                        <el-form-item label="密码" prop="password">
-                            <el-input
-                                v-model="form.password"
-                                :prefix-icon="Lock"
-                                type="password"
-                                show-password
-                                placeholder="请输入密码"
-                                size="large"
-                                @keyup.enter="handleLogin"
-                            />
-                        </el-form-item>
-
-                        <div class="helper-row">
-                            <button type="button" class="fill-default" @click="fillDefaultAccount">
-                                一键填入默认账号
-                            </button>
-                        </div>
-
-                        <el-button
-                            type="primary"
+                <el-form
+                    v-if="!isRegisterMode"
+                    ref="loginFormRef"
+                    :model="loginForm"
+                    :rules="loginRules"
+                    label-position="top"
+                    class="auth-form"
+                >
+                    <el-form-item label="用户名" prop="username">
+                        <el-input
+                            v-model="loginForm.username"
+                            :prefix-icon="User"
+                            placeholder="请输入用户名"
                             size="large"
-                            class="login-button"
-                            :loading="loading"
-                            @click="handleLogin"
-                        >
-                            登录系统
-                        </el-button>
-                    </el-form>
-                </el-card>
-            </section>
+                            @keyup.enter="handleLogin"
+                        />
+                    </el-form-item>
+
+                    <el-form-item label="密码" prop="password">
+                        <el-input
+                            v-model="loginForm.password"
+                            :prefix-icon="Lock"
+                            type="password"
+                            show-password
+                            placeholder="请输入密码"
+                            size="large"
+                            @keyup.enter="handleLogin"
+                        />
+                    </el-form-item>
+
+                    <el-button
+                        type="primary"
+                        size="large"
+                        class="submit-button"
+                        :loading="loginLoading"
+                        @click="handleLogin"
+                    >
+                        登录
+                    </el-button>
+                </el-form>
+
+                <el-form
+                    v-else
+                    ref="registerFormRef"
+                    :model="registerForm"
+                    :rules="registerRules"
+                    label-position="top"
+                    class="auth-form"
+                >
+                    <el-form-item label="用户名" prop="username">
+                        <el-input
+                            v-model="registerForm.username"
+                            :prefix-icon="User"
+                            placeholder="请输入用户名"
+                            size="large"
+                        />
+                    </el-form-item>
+
+                    <el-form-item label="昵称" prop="nickname">
+                        <el-input
+                            v-model="registerForm.nickname"
+                            :prefix-icon="UserFilled"
+                            placeholder="请输入昵称"
+                            size="large"
+                        />
+                    </el-form-item>
+
+                    <el-form-item label="邮箱" prop="email">
+                        <el-input
+                            v-model="registerForm.email"
+                            :prefix-icon="Message"
+                            placeholder="请输入邮箱"
+                            size="large"
+                        />
+                    </el-form-item>
+
+                    <el-form-item label="密码" prop="password">
+                        <el-input
+                            v-model="registerForm.password"
+                            :prefix-icon="Lock"
+                            type="password"
+                            show-password
+                            placeholder="请输入密码"
+                            size="large"
+                        />
+                    </el-form-item>
+
+                    <el-form-item label="确认密码" prop="confirmPassword">
+                        <el-input
+                            v-model="registerForm.confirmPassword"
+                            :prefix-icon="CircleCheck"
+                            type="password"
+                            show-password
+                            placeholder="请再次输入密码"
+                            size="large"
+                            @keyup.enter="handleRegister"
+                        />
+                    </el-form-item>
+
+                    <el-button
+                        type="primary"
+                        size="large"
+                        class="submit-button"
+                        :loading="registerLoading"
+                        @click="handleRegister"
+                    >
+                        注册
+                    </el-button>
+                </el-form>
+
+                <div class="switch-row">
+                    <span>{{ isRegisterMode ? '已经有账户？' : '还没有账户？' }}</span>
+                    <button type="button" class="switch-link" @click="toggleMode">
+                        {{ isRegisterMode ? '登录' : '注册' }}
+                    </button>
+                </div>
+            </el-card>
         </div>
     </div>
 </template>
 
 <script>
-import { Lock, User } from '@element-plus/icons-vue'
+import {
+    CircleCheck,
+    Lock,
+    Message,
+    User,
+    UserFilled
+} from '@element-plus/icons-vue'
+import loginLogo from '@/assets/login-logo.jpg'
 import { useAuthStore } from '@/stores/auth'
+
+function createLoginForm() {
+    return {
+        username: '',
+        password: ''
+    }
+}
+
+function createRegisterForm() {
+    return {
+        username: '',
+        nickname: '',
+        email: '',
+        password: '',
+        confirmPassword: ''
+    }
+}
 
 export default {
     name: 'LoginView',
     components: {
         User,
-        Lock
+        UserFilled,
+        Lock,
+        Message,
+        CircleCheck
     },
     data() {
+        const validateConfirmPassword = (_, value, callback) => {
+            if (!value) {
+                callback(new Error('请再次输入密码'))
+                return
+            }
+
+            if (value !== this.registerForm.password) {
+                callback(new Error('两次输入的密码不一致'))
+                return
+            }
+
+            callback()
+        }
+
         return {
-            loading: false,
-            form: {
-                username: '',
-                password: ''
-            },
-            rules: {
+            loginLogo,
+            mode: 'login',
+            loginLoading: false,
+            registerLoading: false,
+            loginForm: createLoginForm(),
+            registerForm: createRegisterForm(),
+            loginRules: {
                 username: [
                     { required: true, message: '请输入用户名', trigger: 'blur' }
                 ],
                 password: [
                     { required: true, message: '请输入密码', trigger: 'blur' }
                 ]
+            },
+            registerRules: {
+                username: [
+                    { required: true, message: '请输入用户名', trigger: 'blur' },
+                    { min: 3, max: 20, message: '用户名长度必须在 3-20 之间', trigger: 'blur' }
+                ],
+                nickname: [
+                    { required: true, message: '请输入昵称', trigger: 'blur' }
+                ],
+                email: [
+                    { required: true, message: '请输入邮箱', trigger: 'blur' },
+                    { type: 'email', message: '请输入正确的邮箱格式', trigger: 'blur' }
+                ],
+                password: [
+                    { required: true, message: '请输入密码', trigger: 'blur' },
+                    { min: 6, max: 100, message: '密码长度必须在 6-100 之间', trigger: 'blur' }
+                ],
+                confirmPassword: [
+                    { validator: validateConfirmPassword, trigger: 'blur' }
+                ]
             }
+        }
+    },
+    computed: {
+        isRegisterMode() {
+            return this.mode === 'register'
         }
     },
     methods: {
         authStore() {
             return useAuthStore()
         },
-        fillDefaultAccount() {
-            this.form.username = 'admin'
-            this.form.password = 'admin123'
+        toggleMode() {
+            this.mode = this.isRegisterMode ? 'login' : 'register'
+
+            this.$nextTick(() => {
+                this.$refs.loginFormRef?.clearValidate()
+                this.$refs.registerFormRef?.clearValidate()
+            })
         },
         handleLogin() {
-            this.$refs.formRef.validate(async valid => {
+            this.$refs.loginFormRef?.validate(async valid => {
                 if (!valid) return
 
-                this.loading = true
+                this.loginLoading = true
 
                 try {
-                    await this.authStore().login(this.form)
+                    await this.authStore().login(this.loginForm)
                     this.$message.success('登录成功')
 
                     const redirect = typeof this.$route.query.redirect === 'string'
@@ -137,7 +266,28 @@ export default {
                 } catch (error) {
                     console.error('登录失败:', error)
                 } finally {
-                    this.loading = false
+                    this.loginLoading = false
+                }
+            })
+        },
+        handleRegister() {
+            this.$refs.registerFormRef?.validate(async valid => {
+                if (!valid) return
+
+                this.registerLoading = true
+
+                try {
+                    await this.authStore().register(this.registerForm)
+                    this.$message.success('注册成功，请登录')
+
+                    this.loginForm.username = this.registerForm.username
+                    this.loginForm.password = this.registerForm.password
+                    this.registerForm = createRegisterForm()
+                    this.mode = 'login'
+                } catch (error) {
+                    console.error('注册失败:', error)
+                } finally {
+                    this.registerLoading = false
                 }
             })
         }
@@ -150,14 +300,11 @@ export default {
     position: relative;
     min-height: 100vh;
     overflow: hidden;
-    background:
-        radial-gradient(circle at top left, rgba(102, 126, 234, 0.28), transparent 32%),
-        radial-gradient(circle at bottom right, rgba(45, 49, 66, 0.24), transparent 28%),
-        linear-gradient(135deg, #101426 0%, #18203a 45%, #0f172a 100%);
+    background: linear-gradient(180deg, #f9fcfc 0%, #f2f8f8 100%);
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 32px;
+    padding: 24px;
 }
 
 .login-background {
@@ -165,190 +312,166 @@ export default {
     inset: 0;
 }
 
-.bg-orb {
-    position: absolute;
-    border-radius: 999px;
-    filter: blur(12px);
-    opacity: 0.6;
-}
-
-.orb-1 {
-    width: 280px;
-    height: 280px;
-    background: rgba(102, 126, 234, 0.22);
-    top: 8%;
-    left: 10%;
-}
-
-.orb-2 {
-    width: 320px;
-    height: 320px;
-    background: rgba(40, 180, 133, 0.14);
-    right: 6%;
-    bottom: 10%;
-}
-
 .bg-grid {
     position: absolute;
     inset: 0;
     background-image:
-        linear-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
-    background-size: 28px 28px;
-    mask-image: linear-gradient(to bottom, transparent, rgba(0, 0, 0, 0.85), transparent);
+        linear-gradient(rgba(33, 180, 168, 0.08) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(33, 180, 168, 0.08) 1px, transparent 1px);
+    background-size: 80px 80px;
 }
 
-.login-shell {
+.bg-glow {
+    position: absolute;
+    border-radius: 999px;
+    filter: blur(80px);
+    opacity: 0.55;
+}
+
+.glow-top {
+    width: 520px;
+    height: 220px;
+    background: rgba(52, 211, 153, 0.18);
+    left: 50%;
+    top: 6%;
+    transform: translateX(-50%);
+}
+
+.glow-bottom {
+    width: 440px;
+    height: 180px;
+    background: rgba(14, 165, 233, 0.12);
+    left: 50%;
+    bottom: 8%;
+    transform: translateX(-50%);
+}
+
+.login-container {
     position: relative;
     z-index: 1;
-    width: min(1120px, 100%);
-    display: grid;
-    grid-template-columns: 1.1fr 0.9fr;
-    border-radius: 28px;
-    overflow: hidden;
-    box-shadow: 0 24px 80px rgba(0, 0, 0, 0.25);
-    background: rgba(255, 255, 255, 0.08);
-    backdrop-filter: blur(14px);
-    border: 1px solid rgba(255, 255, 255, 0.12);
+    width: min(520px, 100%);
 }
 
-.brand-panel {
-    padding: 56px 52px;
-    color: #f7f9ff;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    background: linear-gradient(160deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.03));
+.brand-block {
+    text-align: center;
+    margin-bottom: 34px;
 }
 
-.brand-badge {
-    align-self: flex-start;
-    padding: 8px 14px;
-    border-radius: 999px;
-    background: rgba(255, 255, 255, 0.12);
-    font-size: 12px;
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
-    margin-bottom: 22px;
-}
-
-.brand-title {
-    font-size: 40px;
-    line-height: 1.2;
-    margin-bottom: 18px;
-}
-
-.brand-subtitle {
-    font-size: 16px;
-    line-height: 1.8;
-    color: rgba(247, 249, 255, 0.8);
-    max-width: 420px;
-}
-
-.brand-cards {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 16px;
-    margin-top: 36px;
-}
-
-.brand-card {
-    padding: 18px 20px;
-    border-radius: 20px;
-    background: rgba(255, 255, 255, 0.08);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-.card-label {
-    font-size: 13px;
-    color: rgba(247, 249, 255, 0.72);
-    margin-bottom: 8px;
-}
-
-.card-value {
-    font-size: 20px;
-    font-weight: 700;
-}
-
-.form-panel {
-    padding: 28px;
-    background: rgba(248, 250, 255, 0.94);
+.brand-logo {
+    width: 76px;
+    height: 76px;
+    border-radius: 22px;
+    margin: 0 auto 18px;
+    background: rgba(255, 255, 255, 0.92);
     display: flex;
     align-items: center;
     justify-content: center;
+    box-shadow: 0 16px 34px rgba(15, 23, 42, 0.18);
+    overflow: hidden;
+    padding: 0;
 }
 
-.login-card {
+.logo-image {
     width: 100%;
-    max-width: 420px;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+.brand-title {
+    font-size: 44px;
+    line-height: 1.1;
+    color: #0f766e;
+    margin-bottom: 10px;
+    letter-spacing: 0.03em;
+}
+
+.brand-subtitle {
+    color: #6b7280;
+    font-size: 16px;
+}
+
+.auth-card {
     border: none;
-    border-radius: 24px;
-    background: rgba(255, 255, 255, 0.92);
+    border-radius: 28px;
+    background: rgba(255, 255, 255, 0.9);
+    box-shadow: 0 20px 60px rgba(15, 23, 42, 0.12);
+    padding: 10px 8px;
 }
 
 .card-header {
+    text-align: center;
     margin-bottom: 28px;
 }
 
 .card-header h2 {
     font-size: 28px;
-    color: #18203a;
+    color: #111827;
     margin-bottom: 10px;
 }
 
 .card-header p {
-    color: #667085;
-    line-height: 1.6;
+    color: #6b7280;
+    font-size: 16px;
 }
 
-.login-form :deep(.el-form-item__label) {
+.auth-form {
+    padding: 0 18px;
+}
+
+.auth-form :deep(.el-form-item__label) {
     font-weight: 600;
-    color: #344054;
+    color: #374151;
 }
 
-.helper-row {
-    display: flex;
-    justify-content: flex-end;
-    margin-top: -4px;
-    margin-bottom: 18px;
+.auth-form :deep(.el-input__wrapper) {
+    min-height: 52px;
+    border-radius: 18px;
+    box-shadow: 0 0 0 1px rgba(15, 23, 42, 0.08) inset;
 }
 
-.fill-default {
+.auth-form :deep(.el-input__wrapper.is-focus) {
+    box-shadow:
+        0 0 0 1px #2dd4bf inset,
+        0 0 0 4px rgba(45, 212, 191, 0.12);
+}
+
+.submit-button {
+    width: 100%;
+    height: 50px;
+    border-radius: 16px;
+    margin-top: 10px;
+    background: linear-gradient(90deg, #22c1b5 0%, #0f9f9a 100%);
+    border: none;
+    font-size: 17px;
+    font-weight: 600;
+    box-shadow: 0 12px 24px rgba(15, 159, 154, 0.24);
+}
+
+.submit-button:hover {
+    background: linear-gradient(90deg, #1eb2a7 0%, #0d908c 100%);
+}
+
+.switch-row {
+    margin-top: 26px;
+    text-align: center;
+    color: #6b7280;
+    font-size: 16px;
+}
+
+.switch-link {
+    margin-left: 8px;
     border: none;
     background: transparent;
-    color: #667eea;
+    color: #0f9f9a;
+    font-size: 16px;
+    font-weight: 600;
     cursor: pointer;
-    font-size: 13px;
     padding: 0;
 }
 
-.fill-default:hover {
-    color: #4a5dc6;
-}
-
-.login-button {
-    width: 100%;
-    height: 46px;
-    border-radius: 14px;
-    font-weight: 600;
-}
-
-@media (max-width: 900px) {
-    .login-shell {
-        grid-template-columns: 1fr;
-    }
-
-    .brand-panel {
-        padding: 40px 28px 28px;
-    }
-
-    .brand-title {
-        font-size: 32px;
-    }
-
-    .form-panel {
-        padding: 0 18px 18px;
-    }
+.switch-link:hover {
+    color: #0c8783;
 }
 
 @media (max-width: 600px) {
@@ -356,12 +479,16 @@ export default {
         padding: 16px;
     }
 
-    .brand-cards {
-        grid-template-columns: 1fr;
+    .brand-title {
+        font-size: 34px;
     }
 
-    .brand-title {
-        font-size: 28px;
+    .brand-subtitle {
+        font-size: 14px;
+    }
+
+    .auth-form {
+        padding: 0 6px;
     }
 }
 </style>

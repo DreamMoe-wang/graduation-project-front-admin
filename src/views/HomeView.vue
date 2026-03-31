@@ -39,6 +39,7 @@
 
 <script>
 import { getDashboardOverview } from '@/api/dashboard'
+import { formatCurrency } from '@/utils/format'
 
 export default {
     name: 'HomeView',
@@ -81,7 +82,7 @@ export default {
             }
         },
         formatAmount(amount) {
-            return `¥${Number(amount || 0).toFixed(2)}`
+            return formatCurrency(amount)
         }
     }
 }

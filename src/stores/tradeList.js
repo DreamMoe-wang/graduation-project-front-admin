@@ -1,6 +1,13 @@
 import { defineStore } from 'pinia'
 import { deleteTradePublish } from '@/api/tradePublish'
 import { exportTradeList, getTradeListDetail, getTradeListPage } from '@/api/tradeList'
+import {
+  applyPageResult,
+  createPaginationState,
+  resetPagination,
+  updateCurrentPage,
+  updatePageSize
+} from '@/utils/pagination'
 
 function createDefaultSearchForm() {
   return {
@@ -12,11 +19,7 @@ function createDefaultSearchForm() {
 }
 
 function createDefaultPagination() {
-  return {
-    currentPage: 1,
-    pageSize: 10,
-    total: 0
-  }
+  return createPaginationState()
 }
 
 export const useTradeListStore = defineStore('tradeList', {
@@ -39,8 +42,7 @@ export const useTradeListStore = defineStore('tradeList', {
           pageSize: this.pagination.pageSize
         })
 
-        this.tableData = pageData?.records || []
-        this.pagination.total = Number(pageData?.total || 0)
+        applyPageResult(this, pageData, 'tableData')
       } catch (error) {
         this.tableData = []
         this.pagination.total = 0
@@ -50,12 +52,12 @@ export const useTradeListStore = defineStore('tradeList', {
       }
     },
     async search() {
-      this.pagination.currentPage = 1
+      resetPagination(this)
       await this.fetchData()
     },
     async resetSearch() {
       this.searchForm = createDefaultSearchForm()
-      this.pagination.currentPage = 1
+      resetPagination(this)
       await this.fetchData()
     },
     async openDetail(id) {
@@ -79,12 +81,11 @@ export const useTradeListStore = defineStore('tradeList', {
       return exportTradeList(this.searchForm)
     },
     async setPageSize(pageSize) {
-      this.pagination.pageSize = pageSize
-      this.pagination.currentPage = 1
+      updatePageSize(this, pageSize)
       await this.fetchData()
     },
     async setCurrentPage(page) {
-      this.pagination.currentPage = page
+      updateCurrentPage(this, page)
       await this.fetchData()
     },
     resetTransientState() {

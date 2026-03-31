@@ -3,8 +3,8 @@
         <!-- 侧边栏 -->
         <aside class="sidebar" :class="{ collapsed: sidebarCollapsed }">
             <div class="logo">
-                <span v-if="!sidebarCollapsed">同城任务</span>
-                <span v-else>任</span>
+                <img :src="sidebarLogo" alt="同城任务" class="logo-image">
+                <span v-if="!sidebarCollapsed" class="logo-text">同城任务</span>
             </div>
             <nav class="menu">
                 <template v-for="item in menuList" :key="item.path">
@@ -88,6 +88,7 @@ import menuConfig from '@/config/menuConfig.js'
 import TagsView from '@/components/TagsView.vue'
 import { useAuthStore } from '@/stores/auth'
 import { ArrowDown, Fold, Expand, ArrowRight } from '@element-plus/icons-vue'
+import sidebarLogo from '@/assets/login-logo.jpg'
 
 export default {
     name: 'BasicLayout',
@@ -101,6 +102,7 @@ export default {
     data() {
         return {
             sidebarCollapsed: false,
+            sidebarLogo,
             menuList: menuConfig,
             expandedGroups: ['trade'] // 默认展开交易集市
         }
@@ -179,11 +181,26 @@ export default {
     display: flex;
     align-items: center;
     justify-content: center;
+    gap: 12px;
     color: white;
-    font-size: 1.5rem;
-    font-weight: bold;
+    font-size: 1.4rem;
+    font-weight: 700;
     border-bottom: 1px solid rgba(255, 255, 255, 0.1);
     background: rgba(0, 0, 0, 0.2);
+    padding: 0 12px;
+}
+
+.logo-image {
+    width: 36px;
+    height: 36px;
+    border-radius: 12px;
+    object-fit: cover;
+    flex-shrink: 0;
+    box-shadow: 0 8px 18px rgba(0, 0, 0, 0.22);
+}
+
+.logo-text {
+    white-space: nowrap;
 }
 
 .menu {
@@ -283,6 +300,16 @@ export default {
     justify-content: center;
     padding: 14px;
     margin: 4px 8px;
+}
+
+.sidebar.collapsed .logo {
+    gap: 0;
+    padding: 0;
+}
+
+.sidebar.collapsed .logo-image {
+    width: 34px;
+    height: 34px;
 }
 
 .sidebar.collapsed .icon {

@@ -7,6 +7,12 @@ import {
   getTradeOrderStats,
   receiveTradeOrder
 } from '@/api/tradeOrder'
+import {
+  applyPageResult,
+  createPaginationState,
+  updateCurrentPage,
+  updatePageSize
+} from '@/utils/pagination'
 
 function createDefaultStats() {
   return {
@@ -18,11 +24,7 @@ function createDefaultStats() {
 }
 
 function createDefaultPagination() {
-  return {
-    currentPage: 1,
-    pageSize: 10,
-    total: 0
-  }
+  return createPaginationState()
 }
 
 function createDefaultActionLoading() {
@@ -59,8 +61,7 @@ export const useTradeOrderStore = defineStore('tradeOrder', {
           ...createDefaultStats(),
           ...stats
         }
-        this.orderList = pageData?.records || []
-        this.pagination.total = Number(pageData?.total || 0)
+        applyPageResult(this, pageData, 'orderList')
       } catch (error) {
         this.orderStats = createDefaultStats()
         this.orderList = []
@@ -109,12 +110,11 @@ export const useTradeOrderStore = defineStore('tradeOrder', {
       return this.actionLoading.id === id && this.actionLoading.type === type
     },
     async setPageSize(pageSize) {
-      this.pagination.pageSize = pageSize
-      this.pagination.currentPage = 1
+      updatePageSize(this, pageSize)
       await this.fetchData()
     },
     async setCurrentPage(page) {
-      this.pagination.currentPage = page
+      updateCurrentPage(this, page)
       await this.fetchData()
     },
     resetTransientState() {

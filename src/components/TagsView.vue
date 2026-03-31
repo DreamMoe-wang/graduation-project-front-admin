@@ -11,11 +11,14 @@
 </template>
 
 <script>
+import { addCloseTagListener } from '@/utils/tags'
+
 export default {
     name: 'TagsView',
     data() {
         return {
-            visitedViews: []
+            visitedViews: [],
+            removeCloseTagListener: null
         }
     },
     watch: {
@@ -25,6 +28,10 @@ export default {
     },
     mounted() {
         this.addTags()
+        this.removeCloseTagListener = addCloseTagListener(this.handleExternalCloseTag)
+    },
+    beforeUnmount() {
+        this.removeCloseTagListener?.()
     },
     methods: {
         isActive(route) {
@@ -62,6 +69,14 @@ export default {
                     this.$router.push('/')
                 }
             }
+        },
+        handleExternalCloseTag(path) {
+            if (!path) return
+
+            const tag = this.visitedViews.find(view => view.path === path)
+            if (!tag) return
+
+            this.handleCloseTag(tag)
         }
     }
 }

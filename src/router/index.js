@@ -30,6 +30,18 @@ const routes = [
         meta: { title: '交易发布' }
       },
       {
+        path: 'trade/publish/create',
+        name: 'TradePublishCreate',
+        component: () => import('@/views/trade/TradePublishForm.vue'),
+        meta: { title: '创建交易' }
+      },
+      {
+        path: 'trade/publish/edit/:id',
+        name: 'TradePublishEdit',
+        component: () => import('@/views/trade/TradePublishForm.vue'),
+        meta: { title: '编辑交易' }
+      },
+      {
         path: 'trade/list',
         name: 'TradeList',
         component: () => import('@/views/trade/TradeList.vue'),

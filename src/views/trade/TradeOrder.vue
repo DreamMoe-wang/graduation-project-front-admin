@@ -142,14 +142,9 @@ import { onMounted, onUnmounted } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { getOrderStatusType } from '@/config/statusConfig'
+import { formatCurrency } from '@/utils/format'
 import { useTradeOrderStore } from '@/stores/tradeOrder'
-
-const ORDER_STATUS_TYPE_MAP = {
-  pending: 'warning',
-  progress: 'primary',
-  success: 'success',
-  cancel: 'info'
-}
 
 export default {
   name: 'TradeOrder',
@@ -214,7 +209,7 @@ export default {
       }
     }
 
-    const handleCurrentChange = async val => {
+        const handleCurrentChange = async val => {
       try {
         await store.setCurrentPage(val)
       } catch (error) {
@@ -222,8 +217,8 @@ export default {
       }
     }
 
-    const formatPrice = price => Number(price || 0).toFixed(2)
-    const getStatusType = status => ORDER_STATUS_TYPE_MAP[status] || ''
+    const formatPrice = price => formatCurrency(price, { withSymbol: false })
+    const getStatusType = status => getOrderStatusType(status)
     const isActionLoading = (id, type) => store.isActionLoading(id, type)
 
     onMounted(async () => {
