@@ -1,11 +1,21 @@
-﻿import { createRouter, createWebHistory } from 'vue-router'
+import { createRouter, createWebHistory } from 'vue-router'
 import BasicLayout from '@/layouts/BasicLayout.vue'
+import { pinia } from '@/stores'
+import { useAuthStore } from '@/stores/auth'
+import { isTokenExpired } from '@/utils/auth'
 
 const routes = [
+  {
+    path: '/login',
+    name: 'Login',
+    component: () => import('@/views/login/LoginView.vue'),
+    meta: { title: '登录', public: true }
+  },
   {
     path: '/',
     name: 'Home',
     component: BasicLayout,
+    meta: { requiresAuth: true },
     children: [
       {
         path: '',
@@ -86,6 +96,39 @@ const routes = [
 const router = createRouter({
   history: createWebHistory(process.env.BASE_URL),
   routes
+})
+
+router.beforeEach(async to => {
+  const authStore = useAuthStore(pinia)
+  const isPublicPage = !!to.meta.public
+
+  if (authStore.token && isTokenExpired(authStore.token)) {
+    authStore.logout()
+  }
+
+  if (authStore.token && !authStore.user) {
+    await authStore.restoreSession()
+  }
+
+  if (isPublicPage) {
+    if (authStore.isLoggedIn) {
+      const redirect = typeof to.query.redirect === 'string' ? to.query.redirect : '/'
+      return redirect === '/login' ? '/' : redirect
+    }
+
+    return true
+  }
+
+  if (!authStore.isLoggedIn) {
+    return {
+      path: '/login',
+      query: {
+        redirect: to.fullPath
+      }
+    }
+  }
+
+  return true
 })
 
 export default router

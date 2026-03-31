@@ -53,8 +53,22 @@
                     </el-icon>
                 </el-button>
                 <div class="header-right">
-                    <el-avatar :size="32" icon="UserFilled" />
-                    <span class="username">管理员</span>
+                    <el-dropdown trigger="click" @command="handleCommand">
+                        <div class="user-entry">
+                            <el-avatar :size="32" :src="currentUser?.avatar">
+                                {{ displayInitial }}
+                            </el-avatar>
+                            <span class="username">{{ displayName }}</span>
+                            <el-icon class="user-arrow">
+                                <ArrowDown />
+                            </el-icon>
+                        </div>
+                        <template #dropdown>
+                            <el-dropdown-menu>
+                                <el-dropdown-item command="logout">退出登录</el-dropdown-item>
+                            </el-dropdown-menu>
+                        </template>
+                    </el-dropdown>
                 </div>
             </header>
 
@@ -72,7 +86,8 @@
 <script>
 import menuConfig from '@/config/menuConfig.js'
 import TagsView from '@/components/TagsView.vue'
-import { Fold, Expand, ArrowRight } from '@element-plus/icons-vue'
+import { useAuthStore } from '@/stores/auth'
+import { ArrowDown, Fold, Expand, ArrowRight } from '@element-plus/icons-vue'
 
 export default {
     name: 'BasicLayout',
@@ -80,13 +95,28 @@ export default {
         TagsView,
         Fold,
         Expand,
-        ArrowRight
+        ArrowRight,
+        ArrowDown
     },
     data() {
         return {
             sidebarCollapsed: false,
             menuList: menuConfig,
             expandedGroups: ['trade'] // 默认展开交易集市
+        }
+    },
+    computed: {
+        authStore() {
+            return useAuthStore()
+        },
+        currentUser() {
+            return this.authStore.currentUser
+        },
+        displayName() {
+            return this.authStore.displayName
+        },
+        displayInitial() {
+            return this.displayName ? this.displayName.charAt(0) : '管'
         }
     },
     methods: {
@@ -99,6 +129,25 @@ export default {
                 this.expandedGroups.splice(index, 1)
             } else {
                 this.expandedGroups.push(path)
+            }
+        },
+        async handleCommand(command) {
+            if (command !== 'logout') return
+
+            try {
+                await this.$confirm('确认退出当前登录状态吗？', '提示', {
+                    confirmButtonText: '确定',
+                    cancelButtonText: '取消',
+                    type: 'warning'
+                })
+
+                this.authStore.logout()
+                this.$router.replace('/login')
+                this.$message.success('已退出登录')
+            } catch (error) {
+                if (error !== 'cancel') {
+                    console.error('退出登录失败:', error)
+                }
             }
         }
     }
@@ -287,9 +336,27 @@ export default {
     gap: 12px;
 }
 
+.user-entry {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+    padding: 6px 10px;
+    border-radius: 999px;
+    transition: background 0.3s ease;
+}
+
+.user-entry:hover {
+    background: #f5f7fb;
+}
+
 .username {
     color: #666;
     font-size: 0.95rem;
+}
+
+.user-arrow {
+    color: #909399;
 }
 
 .content {

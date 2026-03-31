@@ -1,5 +1,6 @@
 import axios from 'axios'
 import { ElMessage } from 'element-plus'
+import { clearAuthStorage, getToken } from '@/utils/auth'
 
 const defaultBaseURL = process.env.VUE_APP_BASE_API
   || (process.env.NODE_ENV === 'development' ? 'http://localhost:9090/api' : '/api')
@@ -12,7 +13,7 @@ const request = axios.create({
 // 请求拦截器
 request.interceptors.request.use(
   config => {
-    const token = localStorage.getItem('admin-token')
+    const token = getToken()
 
     if (token) {
       config.headers = config.headers || {}
@@ -43,6 +44,15 @@ request.interceptors.response.use(
     return payload
   },
   error => {
+    if (error.response?.status === 401) {
+      clearAuthStorage()
+
+      if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/login')) {
+        const redirect = `${window.location.pathname}${window.location.search}`
+        window.location.replace(`/login?redirect=${encodeURIComponent(redirect)}`)
+      }
+    }
+
     const message = error.response?.data?.message || error.message || '网络异常，请稍后重试'
     ElMessage.error(message)
     return Promise.reject(error)
