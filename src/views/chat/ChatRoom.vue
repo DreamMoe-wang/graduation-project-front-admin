@@ -132,13 +132,11 @@
 </template>
 
 <script>
+import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { storeToRefs } from 'pinia'
+import { ElMessage } from 'element-plus'
 import { FolderOpened, Picture, RefreshRight, Search } from '@element-plus/icons-vue'
-import {
-    getChatMessages,
-    getChatSessions,
-    markChatSessionRead,
-    sendChatMessage
-} from '@/api/chat'
+import { useChatStore } from '@/stores/chat'
 
 export default {
     name: 'ChatRoom',
@@ -148,158 +146,120 @@ export default {
         Picture,
         FolderOpened
     },
-    data() {
-        return {
-            searchKeyword: '',
-            currentSessionId: null,
-            messageInput: '',
-            sessionList: [],
-            messageList: [],
-            loadingSessions: false,
-            loadingMessages: false,
-            sending: false,
-            searchTimer: null
-        }
-    },
-    computed: {
-        currentSession() {
-            return this.sessionList.find(item => item.id === this.currentSessionId) || null
-        }
-    },
-    watch: {
-        searchKeyword() {
-            this.scheduleSessionSearch()
-        }
-    },
-    mounted() {
-        this.fetchSessions(false)
-    },
-    beforeUnmount() {
-        if (this.searchTimer) {
-            clearTimeout(this.searchTimer)
-            this.searchTimer = null
-        }
-    },
-    methods: {
-        async fetchSessions(preserveSelection = true) {
-            this.loadingSessions = true
+    setup() {
+        const store = useChatStore()
+        const messageListRef = ref(null)
+        const {
+            searchKeyword,
+            currentSessionId,
+            messageInput,
+            sessionList,
+            messageList,
+            loadingSessions,
+            loadingMessages,
+            sending,
+            currentSession
+        } = storeToRefs(store)
 
-            try {
-                const keyword = this.searchKeyword.trim()
-                const sessions = await getChatSessions(keyword ? { keyword } : {})
-                this.sessionList = Array.isArray(sessions) ? sessions : []
+        let searchTimer = null
 
-                if (!this.sessionList.length) {
-                    this.currentSessionId = null
-                    this.messageList = []
-                    return
-                }
-
-                const hasCurrentSession = preserveSelection &&
-                    this.currentSessionId != null &&
-                    this.sessionList.some(item => item.id === this.currentSessionId)
-
-                if (!hasCurrentSession) {
-                    await this.selectSession(this.sessionList[0])
-                }
-            } catch (error) {
-                this.sessionList = []
-                this.currentSessionId = null
-                this.messageList = []
-                console.error('获取会话列表失败:', error)
-            } finally {
-                this.loadingSessions = false
-            }
-        },
-        async selectSession(session) {
-            if (!session) return
-
-            this.currentSessionId = session.id
-
-            try {
-                if (session.unread > 0) {
-                    await markChatSessionRead(session.id)
-                    session.unread = 0
-                }
-
-                await this.fetchMessages(session.id)
-            } catch (error) {
-                console.error('切换会话失败:', error)
-            }
-        },
-        async fetchMessages(sessionId = this.currentSessionId) {
-            if (!sessionId) return
-
-            this.loadingMessages = true
-
-            try {
-                const messages = await getChatMessages(sessionId)
-                this.messageList = Array.isArray(messages) ? messages : []
-
-                this.$nextTick(() => {
-                    this.scrollToBottom()
-                })
-            } catch (error) {
-                this.messageList = []
-                console.error('获取聊天消息失败:', error)
-            } finally {
-                this.loadingMessages = false
-            }
-        },
-        async sendMessage() {
-            const content = this.messageInput.trim()
-
-            if (!content || !this.currentSessionId) return
-
-            this.sending = true
-
-            try {
-                await sendChatMessage(this.currentSessionId, { content })
-                this.messageInput = ''
-
-                await Promise.all([
-                    this.fetchMessages(this.currentSessionId),
-                    this.fetchSessions(true)
-                ])
-            } catch (error) {
-                console.error('发送消息失败:', error)
-            } finally {
-                this.sending = false
-            }
-        },
-        async refreshCurrentSession() {
-            if (!this.currentSessionId) return
-
-            try {
-                await Promise.all([
-                    this.fetchMessages(this.currentSessionId),
-                    this.fetchSessions(true)
-                ])
-            } catch (error) {
-                console.error('刷新会话失败:', error)
-            }
-        },
-        scheduleSessionSearch() {
-            if (this.searchTimer) {
-                clearTimeout(this.searchTimer)
-            }
-
-            this.searchTimer = setTimeout(() => {
-                this.fetchSessions(true)
-            }, 300)
-        },
-        scrollToBottom() {
-            const container = this.$refs.messageListRef
+        const scrollToBottom = () => {
+            const container = messageListRef.value
 
             if (container) {
                 container.scrollTop = container.scrollHeight
             }
-        },
-        getDisplayInitial(name) {
-            return name ? name.charAt(0) : '?'
-        },
-        showPlaceholderMessage(type) {
-            this.$message.info(`${type}消息功能暂未接入后端接口`)
+        }
+
+        const getDisplayInitial = name => (name ? name.charAt(0) : '?')
+
+        const fetchSessions = async preserveSelection => {
+            try {
+                await store.fetchSessions(preserveSelection)
+            } catch (error) {
+                console.error('获取会话列表失败:', error)
+            }
+        }
+
+        const selectSession = async session => {
+            try {
+                await store.selectSession(session)
+            } catch (error) {
+                console.error('切换会话失败:', error)
+            }
+        }
+
+        const sendMessage = async () => {
+            try {
+                await store.sendCurrentMessage()
+            } catch (error) {
+                console.error('发送消息失败:', error)
+            }
+        }
+
+        const refreshCurrentSession = async () => {
+            try {
+                await store.refreshCurrentSession()
+            } catch (error) {
+                console.error('刷新会话失败:', error)
+            }
+        }
+
+        const scheduleSessionSearch = () => {
+            if (searchTimer) {
+                clearTimeout(searchTimer)
+            }
+
+            searchTimer = setTimeout(() => {
+                fetchSessions(true)
+            }, 300)
+        }
+
+        const showPlaceholderMessage = type => {
+            ElMessage.info(`${type}消息功能暂未接入后端接口`)
+        }
+
+        watch(searchKeyword, () => {
+            scheduleSessionSearch()
+        })
+
+        watch(
+            messageList,
+            () => {
+                nextTick(() => {
+                    scrollToBottom()
+                })
+            },
+            { deep: true }
+        )
+
+        onMounted(() => {
+            fetchSessions(false)
+        })
+
+        onBeforeUnmount(() => {
+            if (searchTimer) {
+                clearTimeout(searchTimer)
+                searchTimer = null
+            }
+        })
+
+        return {
+            messageListRef,
+            searchKeyword,
+            currentSessionId,
+            messageInput,
+            sessionList,
+            messageList,
+            loadingSessions,
+            loadingMessages,
+            sending,
+            currentSession,
+            selectSession,
+            sendMessage,
+            refreshCurrentSession,
+            getDisplayInitial,
+            showPlaceholderMessage
         }
     }
 }

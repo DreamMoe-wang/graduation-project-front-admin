@@ -154,9 +154,30 @@
 </template>
 
 <script>
+import { onMounted, onUnmounted } from 'vue'
+import { storeToRefs } from 'pinia'
+import { useRouter } from 'vue-router'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { Search, Refresh, Download } from '@element-plus/icons-vue'
-import { deleteTradePublish } from '@/api/tradePublish'
-import { exportTradeList, getTradeListDetail, getTradeListPage } from '@/api/tradeList'
+import { useTradeListStore } from '@/stores/tradeList'
+
+const TRADE_STATUS_TYPE_MAP = {
+    draft: 'info',
+    auditing: 'warning',
+    published: 'primary',
+    rejected: 'danger',
+    trading: 'success',
+    completed: ''
+}
+
+const TRADE_STATUS_TEXT_MAP = {
+    draft: '草稿',
+    auditing: '审核中',
+    published: '已发布',
+    rejected: '未通过',
+    trading: '交易中',
+    completed: '交易结束'
+}
 
 export default {
     name: 'TradeList',
@@ -165,154 +186,118 @@ export default {
         Refresh,
         Download
     },
-    data() {
-        return {
-            // 搜索表单
-            searchForm: {
-                status: '',
-                minAmount: '',
-                maxAmount: '',
-                dateRange: []
-            },
-            // 表格数据
-            tableData: [],
-            loading: false,
-            // 分页
-            pagination: {
-                currentPage: 1,
-                pageSize: 10,
-                total: 0
-            },
-            // 排序
-            sortField: '',
-            sortOrder: '',
-            // 对话框
-            detailVisible: false,
-            currentRow: null
-        }
-    },
-    mounted() {
-        this.fetchData()
-    },
-    methods: {
-        // 获取数据
-        async fetchData() {
-            this.loading = true
+    setup() {
+        const store = useTradeListStore()
+        const router = useRouter()
+        const { searchForm, tableData, loading, pagination, detailVisible, currentRow } = storeToRefs(store)
 
+        const handleSearch = async () => {
             try {
-                const pageData = await getTradeListPage({
-                    ...this.searchForm,
-                    pageNum: this.pagination.currentPage,
-                    pageSize: this.pagination.pageSize
-                })
-
-                this.tableData = pageData?.records || []
-                this.pagination.total = Number(pageData?.total || 0)
+                await store.search()
             } catch (error) {
-                this.tableData = []
-                this.pagination.total = 0
-                console.error('获取交易大全列表失败:', error)
-            } finally {
-                this.loading = false
+                console.error('搜索交易大全失败:', error)
             }
-        },
-        // 搜索
-        handleSearch() {
-            console.log('搜索条件:', this.searchForm)
-            this.pagination.currentPage = 1
-            this.fetchData()
-        },
-        // 重置
-        handleReset() {
-            this.searchForm = {
-                status: '',
-                minAmount: '',
-                maxAmount: '',
-                dateRange: []
-            }
-            this.pagination.currentPage = 1
-            this.fetchData()
-        },
-        // 查看详情
-        async handleViewDetail(row) {
+        }
+
+        const handleReset = async () => {
             try {
-                this.currentRow = await getTradeListDetail(row.id)
-                this.detailVisible = true
+                await store.resetSearch()
+            } catch (error) {
+                console.error('重置交易大全筛选失败:', error)
+            }
+        }
+
+        const handleViewDetail = async row => {
+            try {
+                await store.openDetail(row.id)
             } catch (error) {
                 console.error('获取交易详情失败:', error)
             }
-        },
-        // 编辑
-        handleEdit(row) {
-            // 跳转到交易发布页面进行编辑
-            this.$router.push({
+        }
+
+        const handleEdit = row => {
+            router.push({
                 path: '/trade/publish',
                 query: { id: row.id }
             })
-        },
-        // 删除
-        handleDelete(row) {
-            this.$confirm(`确定要删除交易"${row.title}"吗？`, '提示', {
-                confirmButtonText: '确定',
-                cancelButtonText: '取消',
-                type: 'warning'
-            }).then(async () => {
-                await deleteTradePublish(row.id)
+        }
 
-                if (this.tableData.length === 1 && this.pagination.currentPage > 1) {
-                    this.pagination.currentPage -= 1
-                }
-
-                this.$message.success('删除成功')
-                await this.fetchData()
-            }).catch(() => { })
-        },
-        // 导出
-        async handleExport() {
+        const handleDelete = async row => {
             try {
-                const data = await exportTradeList(this.searchForm)
-                this.$message.info(data?.message || '导出接口已预留')
+                await ElMessageBox.confirm(`确定要删除交易"${row.title}"吗？`, '提示', {
+                    confirmButtonText: '确定',
+                    cancelButtonText: '取消',
+                    type: 'warning'
+                })
+
+                await store.deleteById(row.id)
+                ElMessage.success('删除成功')
+            } catch (error) {
+                if (error !== 'cancel' && error !== 'close') {
+                    console.error('删除交易失败:', error)
+                }
+            }
+        }
+
+        const handleExport = async () => {
+            try {
+                const data = await store.exportData()
+                ElMessage.info(data?.message || '导出接口已预留')
             } catch (error) {
                 console.error('导出交易列表失败:', error)
             }
-        },
-        // 分页处理
-        handleSizeChange(val) {
-            this.pagination.pageSize = val
-            this.pagination.currentPage = 1
-            this.fetchData()
-        },
-        handleCurrentChange(val) {
-            this.pagination.currentPage = val
-            this.fetchData()
-        },
-        // 格式化金额
-        formatAmount(amount) {
-            return Number(amount || 0).toFixed(2)
-        },
-        // 获取状态类型
-        getStatusType(status) {
-            const typeMap = {
-                draft: 'info',
-                auditing: 'warning',
-                published: 'primary',
-                rejected: 'danger',
-                trading: 'success',
-                completed: ''
+        }
+
+        const handleSizeChange = async val => {
+            try {
+                await store.setPageSize(val)
+            } catch (error) {
+                console.error('切换交易大全分页大小失败:', error)
             }
-            return typeMap[status] || 'info'
-        },
-        // 获取状态文本
-        getStatusText(status) {
-            const textMap = {
-                draft: '草稿',
-                auditing: '审核中',
-                published: '已发布',
-                rejected: '未通过',
-                trading: '交易中',
-                completed: '交易结束'
+        }
+
+        const handleCurrentChange = async val => {
+            try {
+                await store.setCurrentPage(val)
+            } catch (error) {
+                console.error('切换交易大全页码失败:', error)
             }
-            return textMap[status] || status
+        }
+
+        const formatAmount = amount => Number(amount || 0).toFixed(2)
+        const getStatusType = status => TRADE_STATUS_TYPE_MAP[status] || 'info'
+        const getStatusText = status => TRADE_STATUS_TEXT_MAP[status] || status
+
+        onMounted(async () => {
+            try {
+                await store.fetchData()
+            } catch (error) {
+                console.error('获取交易大全列表失败:', error)
+            }
+        })
+
+        onUnmounted(() => {
+            store.resetTransientState()
+        })
+
+        return {
+            searchForm,
+            tableData,
+            loading,
+            pagination,
+            detailVisible,
+            currentRow,
+            handleSearch,
+            handleReset,
+            handleViewDetail,
+            handleEdit,
+            handleDelete,
+            handleExport,
+            handleSizeChange,
+            handleCurrentChange,
+            formatAmount,
+            getStatusType,
+            getStatusText
         }
     }
 }

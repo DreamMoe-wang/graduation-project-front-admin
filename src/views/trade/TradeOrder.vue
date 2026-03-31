@@ -138,151 +138,123 @@
 </template>
 
 <script>
-import {
-  cancelTradeOrder,
-  completeTradeOrder,
-  getTradeOrderDetail,
-  getTradeOrderPage,
-  getTradeOrderStats,
-  receiveTradeOrder
-} from '@/api/tradeOrder'
+import { onMounted, onUnmounted } from 'vue'
+import { storeToRefs } from 'pinia'
+import { useRouter } from 'vue-router'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { useTradeOrderStore } from '@/stores/tradeOrder'
 
-function createDefaultStats() {
-  return {
-    totalCount: 0,
-    pendingCount: 0,
-    progressCount: 0,
-    successCount: 0
-  }
-}
-
-function createDefaultActionLoading() {
-  return {
-    id: null,
-    type: ''
-  }
+const ORDER_STATUS_TYPE_MAP = {
+  pending: 'warning',
+  progress: 'primary',
+  success: 'success',
+  cancel: 'info'
 }
 
 export default {
   name: 'TradeOrder',
-  data() {
-    return {
-      loading: false,
-      orderStats: createDefaultStats(),
-      orderList: [],
-      pagination: {
-        currentPage: 1,
-        pageSize: 10,
-        total: 0
-      },
-      detailVisible: false,
-      currentOrder: null,
-      actionLoading: createDefaultActionLoading()
-    }
-  },
-  mounted() {
-    this.fetchData()
-  },
-  methods: {
-    async fetchData() {
-      this.loading = true
+  setup() {
+    const store = useTradeOrderStore()
+    const router = useRouter()
+    const { loading, orderStats, orderList, pagination, detailVisible, currentOrder } = storeToRefs(store)
 
+    const handleViewDetail = async item => {
       try {
-        const [stats, pageData] = await Promise.all([
-          getTradeOrderStats(),
-          getTradeOrderPage({
-            pageNum: this.pagination.currentPage,
-            pageSize: this.pagination.pageSize
-          })
-        ])
-
-        this.orderStats = {
-          ...createDefaultStats(),
-          ...stats
-        }
-        this.orderList = pageData?.records || []
-        this.pagination.total = Number(pageData?.total || 0)
-      } catch (error) {
-        this.orderStats = createDefaultStats()
-        this.orderList = []
-        this.pagination.total = 0
-        console.error('获取订单数据失败:', error)
-      } finally {
-        this.loading = false
-      }
-    },
-    async handleViewDetail(item) {
-      try {
-        this.currentOrder = await getTradeOrderDetail(item.id)
-        this.detailVisible = true
+        await store.openDetail(item.id)
       } catch (error) {
         console.error('获取订单详情失败:', error)
       }
-    },
-    handleReceive(item) {
-      this.runOrderAction(item, 'receive', receiveTradeOrder, '接单成功')
-    },
-    handleComplete(item) {
-      this.runOrderAction(item, 'complete', completeTradeOrder, '订单已完成')
-    },
-    handleCancel(item) {
-      this.$confirm(`确定要取消订单"${item.orderNo}"吗？`, '提示', {
-        confirmButtonText: '确定',
-        cancelButtonText: '取消',
-        type: 'warning'
-      }).then(() => {
-        this.runOrderAction(item, 'cancel', cancelTradeOrder, '订单已取消')
-      }).catch(() => { })
-    },
-    async runOrderAction(item, type, requestFn, successMessage) {
-      this.actionLoading = {
-        id: item.id,
-        type
-      }
+    }
 
+    const handleReceive = async item => {
       try {
-        await requestFn(item.id)
-        this.$message.success(successMessage)
-
-        if (this.detailVisible && this.currentOrder?.id === item.id) {
-          this.currentOrder = await getTradeOrderDetail(item.id)
-        }
-
-        await this.fetchData()
+        await store.receive(item.id)
+        ElMessage.success('接单成功')
       } catch (error) {
-        console.error('订单操作失败:', error)
-      } finally {
-        this.actionLoading = createDefaultActionLoading()
+        console.error('接单失败:', error)
       }
-    },
-    isActionLoading(id, type) {
-      return this.actionLoading.id === id && this.actionLoading.type === type
-    },
-    handleContact() {
-      this.$router.push('/chat')
-      this.$message.info('已跳转到聊天室，请在会话列表中联系对方')
-    },
-    handleSizeChange(val) {
-      this.pagination.pageSize = val
-      this.pagination.currentPage = 1
-      this.fetchData()
-    },
-    handleCurrentChange(val) {
-      this.pagination.currentPage = val
-      this.fetchData()
-    },
-    formatPrice(price) {
-      return Number(price || 0).toFixed(2)
-    },
-    getStatusType(status) {
-      const typeMap = {
-        pending: 'warning',
-        progress: 'primary',
-        success: 'success',
-        cancel: 'info'
-      }
+    }
 
-      return typeMap[status] || ''
+    const handleComplete = async item => {
+      try {
+        await store.complete(item.id)
+        ElMessage.success('订单已完成')
+      } catch (error) {
+        console.error('完成订单失败:', error)
+      }
+    }
+
+    const handleCancel = async item => {
+      try {
+        await ElMessageBox.confirm(`确定要取消订单"${item.orderNo}"吗？`, '提示', {
+          confirmButtonText: '确定',
+          cancelButtonText: '取消',
+          type: 'warning'
+        })
+
+        await store.cancel(item.id)
+        ElMessage.success('订单已取消')
+      } catch (error) {
+        if (error !== 'cancel' && error !== 'close') {
+          console.error('取消订单失败:', error)
+        }
+      }
+    }
+
+    const handleContact = () => {
+      router.push('/chat')
+      ElMessage.info('已跳转到聊天室，请在会话列表中联系对方')
+    }
+
+    const handleSizeChange = async val => {
+      try {
+        await store.setPageSize(val)
+      } catch (error) {
+        console.error('切换订单分页大小失败:', error)
+      }
+    }
+
+    const handleCurrentChange = async val => {
+      try {
+        await store.setCurrentPage(val)
+      } catch (error) {
+        console.error('切换订单页码失败:', error)
+      }
+    }
+
+    const formatPrice = price => Number(price || 0).toFixed(2)
+    const getStatusType = status => ORDER_STATUS_TYPE_MAP[status] || ''
+    const isActionLoading = (id, type) => store.isActionLoading(id, type)
+
+    onMounted(async () => {
+      try {
+        await store.fetchData()
+      } catch (error) {
+        console.error('获取订单数据失败:', error)
+      }
+    })
+
+    onUnmounted(() => {
+      store.resetTransientState()
+    })
+
+    return {
+      loading,
+      orderStats,
+      orderList,
+      pagination,
+      detailVisible,
+      currentOrder,
+      handleViewDetail,
+      handleReceive,
+      handleComplete,
+      handleCancel,
+      handleContact,
+      handleSizeChange,
+      handleCurrentChange,
+      formatPrice,
+      getStatusType,
+      isActionLoading
     }
   }
 }

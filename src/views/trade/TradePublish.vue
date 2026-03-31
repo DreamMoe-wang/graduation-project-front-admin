@@ -167,35 +167,49 @@
 </template>
 
 <script>
+import { onMounted, onUnmounted, ref, watch } from 'vue'
+import { storeToRefs } from 'pinia'
+import { useRoute, useRouter } from 'vue-router'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { Search, Refresh, Plus } from '@element-plus/icons-vue'
-import {
-    createTradePublish,
-    deleteTradePublish,
-    getTradePublishDetail,
-    getTradePublishPage,
-    updateTradePublish
-} from '@/api/tradePublish'
+import { useTradePublishStore } from '@/stores/tradePublish'
 
-function createDefaultFormData() {
-    return {
-        id: null,
-        title: '',
-        clientName: '',
-        clientPhone: '',
-        workerName: '',
-        workerPhone: '',
-        amount: 0,
-        status: 'draft',
-        description: ''
-    }
+const TRADE_STATUS_TYPE_MAP = {
+    draft: 'info',
+    auditing: 'warning',
+    published: 'primary',
+    rejected: 'danger',
+    trading: 'success',
+    completed: ''
 }
 
-function normalizeFormData(data = {}) {
-    return {
-        ...createDefaultFormData(),
-        ...data,
-        amount: data.amount != null ? Number(data.amount) : 0
-    }
+const TRADE_STATUS_TEXT_MAP = {
+    draft: '草稿',
+    auditing: '审核中',
+    published: '已发布',
+    rejected: '未通过',
+    trading: '交易中',
+    completed: '交易结束'
+}
+
+const formRules = {
+    title: [
+        { required: true, message: '请输入交易标题', trigger: 'blur' },
+        { min: 2, max: 50, message: '长度在 2 到 50 个字符', trigger: 'blur' }
+    ],
+    clientName: [
+        { required: true, message: '请输入委托人姓名', trigger: 'blur' }
+    ],
+    clientPhone: [
+        { required: true, message: '请输入委托人电话', trigger: 'blur' },
+        { pattern: /^1[3-9]\d{9}$/, message: '请输入正确的手机号', trigger: 'blur' }
+    ],
+    amount: [
+        { required: true, message: '请输入交易金额', trigger: 'blur' }
+    ],
+    status: [
+        { required: true, message: '请选择交易状态', trigger: 'change' }
+    ]
 }
 
 export default {
@@ -205,246 +219,191 @@ export default {
         Refresh,
         Plus
     },
-    data() {
-        return {
-            // 搜索表单
-            searchForm: {
-                title: '',
-                status: ''
-            },
-            // 表格数据
-            tableData: [],
-            loading: false,
-            // 分页
-            pagination: {
-                currentPage: 1,
-                pageSize: 10,
-                total: 0
-            },
-            // 对话框
-            dialogVisible: false,
-            detailVisible: false,
-            dialogTitle: '',
-            isEdit: false,
-            submitLoading: false,
-            currentRow: null,
-            // 表单数据
-            formData: createDefaultFormData(),
-            // 表单验证规则
-            formRules: {
-                title: [
-                    { required: true, message: '请输入交易标题', trigger: 'blur' },
-                    { min: 2, max: 50, message: '长度在 2 到 50 个字符', trigger: 'blur' }
-                ],
-                clientName: [
-                    { required: true, message: '请输入委托人姓名', trigger: 'blur' }
-                ],
-                clientPhone: [
-                    { required: true, message: '请输入委托人电话', trigger: 'blur' },
-                    { pattern: /^1[3-9]\d{9}$/, message: '请输入正确的手机号', trigger: 'blur' }
-                ],
-                amount: [
-                    { required: true, message: '请输入交易金额', trigger: 'blur' }
-                ],
-                status: [
-                    { required: true, message: '请选择交易状态', trigger: 'change' }
-                ]
-            }
-        }
-    },
-    mounted() {
-        this.fetchData()
+    setup() {
+        const store = useTradePublishStore()
+        const route = useRoute()
+        const router = useRouter()
+        const formRef = ref(null)
+        const {
+            searchForm,
+            tableData,
+            loading,
+            pagination,
+            dialogVisible,
+            detailVisible,
+            dialogTitle,
+            isEdit,
+            submitLoading,
+            currentRow,
+            formData
+        } = storeToRefs(store)
 
-        if (this.$route.query.id) {
-            this.openEditDialogById(this.$route.query.id)
-        }
-    },
-    watch: {
-        '$route.query.id'(id) {
-            if (id) {
-                this.openEditDialogById(id)
-            }
-        }
-    },
-    methods: {
-        // 获取数据
-        async fetchData() {
-            this.loading = true
+        const clearEditQuery = () => {
+            if (!route.query.id) return
 
-            try {
-                const pageData = await getTradePublishPage({
-                    ...this.searchForm,
-                    pageNum: this.pagination.currentPage,
-                    pageSize: this.pagination.pageSize
-                })
-
-                this.tableData = pageData?.records || []
-                this.pagination.total = Number(pageData?.total || 0)
-            } catch (error) {
-                this.tableData = []
-                this.pagination.total = 0
-                console.error('获取交易发布列表失败:', error)
-            } finally {
-                this.loading = false
-            }
-        },
-        // 搜索
-        handleSearch() {
-            this.pagination.currentPage = 1
-            this.fetchData()
-        },
-        // 重置
-        handleReset() {
-            this.searchForm = {
-                title: '',
-                status: ''
-            }
-            this.pagination.currentPage = 1
-            this.fetchData()
-        },
-        // 添加
-        handleAdd() {
-            this.clearEditQuery()
-            this.dialogTitle = '发布交易'
-            this.isEdit = false
-            this.formData = createDefaultFormData()
-            this.dialogVisible = true
-            this.$nextTick(() => {
-                this.$refs.formRef?.clearValidate()
-            })
-        },
-        // 编辑
-        handleEdit(row) {
-            this.openEditDialogById(row.id)
-        },
-        // 查看详情
-        async handleViewDetail(row) {
-            try {
-                this.currentRow = await getTradePublishDetail(row.id)
-                this.detailVisible = true
-            } catch (error) {
-                console.error('获取交易详情失败:', error)
-            }
-        },
-        // 删除
-        handleDelete(row) {
-            this.$confirm(`确定要删除交易"${row.title}"吗？`, '提示', {
-                confirmButtonText: '确定',
-                cancelButtonText: '取消',
-                type: 'warning'
-            }).then(async () => {
-                await deleteTradePublish(row.id)
-
-                if (this.tableData.length === 1 && this.pagination.currentPage > 1) {
-                    this.pagination.currentPage -= 1
-                }
-
-                this.$message.success('删除成功')
-                await this.fetchData()
+            const query = { ...route.query }
+            delete query.id
+            router.replace({
+                path: route.path,
+                query
             }).catch(() => { })
-        },
-        // 提交表单
-        handleSubmit() {
-            this.$refs.formRef.validate(async (valid) => {
-                if (valid) {
-                    this.submitLoading = true
+        }
 
-                    try {
-                        const { id, ...rest } = this.formData
-                        const payload = {
-                            ...rest,
-                            amount: Number(rest.amount || 0)
-                        }
-
-                        if (this.isEdit && this.formData.id) {
-                            await updateTradePublish(this.formData.id, payload)
-                        } else {
-                            await createTradePublish(payload)
-                        }
-
-                        this.$message.success(this.isEdit ? '修改成功' : '发布成功')
-                        this.dialogVisible = false
-                        this.clearEditQuery()
-                        await this.fetchData()
-                    } catch (error) {
-                        console.error('保存交易失败:', error)
-                    } finally {
-                        this.submitLoading = false
-                    }
-                }
-            })
-        },
-        // 关闭对话框
-        handleDialogClose() {
-            this.$refs.formRef?.resetFields()
-            this.formData = createDefaultFormData()
-            this.clearEditQuery()
-        },
-        // 分页处理
-        handleSizeChange(val) {
-            this.pagination.pageSize = val
-            this.pagination.currentPage = 1
-            this.fetchData()
-        },
-        handleCurrentChange(val) {
-            this.pagination.currentPage = val
-            this.fetchData()
-        },
-        async openEditDialogById(id) {
+        const openEditDialogById = async id => {
             if (!id) return
 
             try {
-                this.dialogTitle = '编辑交易'
-                this.isEdit = true
-
-                const detail = await getTradePublishDetail(id)
-                this.formData = normalizeFormData(detail)
-                this.dialogVisible = true
-
-                this.$nextTick(() => {
-                    this.$refs.formRef?.clearValidate()
-                })
+                await store.openEditDialogById(id)
             } catch (error) {
                 console.error('打开编辑弹窗失败:', error)
             }
-        },
-        clearEditQuery() {
-            if (!this.$route.query.id) return
+        }
 
-            const query = { ...this.$route.query }
-            delete query.id
-            this.$router.replace({
-                path: this.$route.path,
-                query
-            }).catch(() => { })
-        },
-        // 格式化金额
-        formatAmount(amount) {
-            return `¥${Number(amount || 0).toFixed(2)}`
-        },
-        // 获取状态类型
-        getStatusType(status) {
-            const typeMap = {
-                draft: 'info',
-                auditing: 'warning',
-                published: 'primary',
-                rejected: 'danger',
-                trading: 'success',
-                completed: ''
+        const handleSearch = async () => {
+            try {
+                await store.search()
+            } catch (error) {
+                console.error('搜索交易发布失败:', error)
             }
-            return typeMap[status] || 'info'
-        },
-        // 获取状态文本
-        getStatusText(status) {
-            const textMap = {
-                draft: '草稿',
-                auditing: '审核中',
-                published: '已发布',
-                rejected: '未通过',
-                trading: '交易中',
-                completed: '交易结束'
+        }
+
+        const handleReset = async () => {
+            try {
+                await store.resetSearch()
+            } catch (error) {
+                console.error('重置交易发布筛选失败:', error)
             }
-            return textMap[status] || status
+        }
+
+        const handleAdd = () => {
+            clearEditQuery()
+            store.openCreateDialog()
+            setTimeout(() => {
+                formRef.value?.clearValidate()
+            })
+        }
+
+        const handleEdit = row => {
+            openEditDialogById(row.id)
+        }
+
+        const handleViewDetail = async row => {
+            try {
+                await store.openDetail(row.id)
+            } catch (error) {
+                console.error('获取交易详情失败:', error)
+            }
+        }
+
+        const handleDelete = async row => {
+            try {
+                await ElMessageBox.confirm(`确定要删除交易"${row.title}"吗？`, '提示', {
+                    confirmButtonText: '确定',
+                    cancelButtonText: '取消',
+                    type: 'warning'
+                })
+
+                await store.deleteById(row.id)
+                ElMessage.success('删除成功')
+            } catch (error) {
+                if (error !== 'cancel' && error !== 'close') {
+                    console.error('删除交易失败:', error)
+                }
+            }
+        }
+
+        const handleSubmit = () => {
+            formRef.value?.validate(async valid => {
+                if (!valid) return
+
+                try {
+                    const mode = await store.submitForm()
+                    ElMessage.success(mode === 'edit' ? '修改成功' : '发布成功')
+                    clearEditQuery()
+                } catch (error) {
+                    console.error('保存交易失败:', error)
+                }
+            })
+        }
+
+        const handleDialogClose = () => {
+            formRef.value?.resetFields()
+            store.closeDialog()
+            clearEditQuery()
+        }
+
+        const handleSizeChange = async val => {
+            try {
+                await store.setPageSize(val)
+            } catch (error) {
+                console.error('切换交易发布分页大小失败:', error)
+            }
+        }
+
+        const handleCurrentChange = async val => {
+            try {
+                await store.setCurrentPage(val)
+            } catch (error) {
+                console.error('切换交易发布页码失败:', error)
+            }
+        }
+
+        const formatAmount = amount => `¥${Number(amount || 0).toFixed(2)}`
+        const getStatusType = status => TRADE_STATUS_TYPE_MAP[status] || 'info'
+        const getStatusText = status => TRADE_STATUS_TEXT_MAP[status] || status
+
+        onMounted(async () => {
+            try {
+                await store.fetchData()
+            } catch (error) {
+                console.error('获取交易发布列表失败:', error)
+            }
+
+            if (route.query.id) {
+                await openEditDialogById(route.query.id)
+            }
+        })
+
+        watch(
+            () => route.query.id,
+            async id => {
+                if (id) {
+                    await openEditDialogById(id)
+                }
+            }
+        )
+
+        onUnmounted(() => {
+            store.resetTransientState()
+        })
+
+        return {
+            formRef,
+            formRules,
+            searchForm,
+            tableData,
+            loading,
+            pagination,
+            dialogVisible,
+            detailVisible,
+            dialogTitle,
+            isEdit,
+            submitLoading,
+            currentRow,
+            formData,
+            handleSearch,
+            handleReset,
+            handleAdd,
+            handleEdit,
+            handleViewDetail,
+            handleDelete,
+            handleSubmit,
+            handleDialogClose,
+            handleSizeChange,
+            handleCurrentChange,
+            formatAmount,
+            getStatusType,
+            getStatusText
         }
     }
 }
