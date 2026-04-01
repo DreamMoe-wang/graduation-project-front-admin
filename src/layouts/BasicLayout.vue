@@ -1,50 +1,66 @@
 <template>
     <div class="layout-container">
-        <!-- 侧边栏 -->
         <aside class="sidebar" :class="{ collapsed: sidebarCollapsed }">
             <div class="logo">
                 <img :src="sidebarLogo" alt="同城任务" class="logo-image">
                 <span v-if="!sidebarCollapsed" class="logo-text">同城任务</span>
             </div>
+
             <nav class="menu">
-                <template v-for="item in menuList" :key="item.path">
-                    <!-- 一级菜单 -->
+                <template v-for="item in normalizedMenus" :key="item.id || item.path">
                     <div v-if="item.children && item.children.length > 0" class="menu-group">
                         <div class="menu-item group-title" @click="toggleGroup(item.path)">
                             <el-icon class="icon" :size="20">
-                                <component :is="item.icon" />
+                                <component :is="item.icon || 'Menu'" />
                             </el-icon>
                             <span v-if="!sidebarCollapsed" class="menu-name">{{ item.name }}</span>
-                            <el-icon v-if="!sidebarCollapsed" class="arrow"
-                                :class="{ rotated: expandedGroups.includes(item.path) }">
+                            <el-icon
+                                v-if="!sidebarCollapsed"
+                                class="arrow"
+                                :class="{ rotated: expandedGroups.includes(item.path) }"
+                            >
                                 <ArrowRight />
                             </el-icon>
                         </div>
-                        <!-- 子菜单 -->
                         <div v-show="!sidebarCollapsed && expandedGroups.includes(item.path)" class="submenu">
-                            <router-link v-for="child in item.children" :key="child.path" :to="child.path"
-                                class="menu-item submenu-item" active-class="active">
+                            <router-link
+                                v-for="child in item.children"
+                                :key="child.id || child.path"
+                                :to="child.path"
+                                class="menu-item submenu-item"
+                                active-class="active"
+                            >
                                 <el-icon class="icon" :size="18">
-                                    <component :is="child.icon" />
+                                    <component :is="child.icon || 'Document'" />
                                 </el-icon>
                                 <span class="menu-name">{{ child.name }}</span>
                             </router-link>
                         </div>
                     </div>
-                    <!-- 无子菜单 -->
-                    <router-link v-else :to="item.path" class="menu-item" active-class="active">
+
+                    <router-link
+                        v-else
+                        :to="item.path"
+                        class="menu-item"
+                        active-class="active"
+                    >
                         <el-icon class="icon" :size="20">
-                            <component :is="item.icon" />
+                            <component :is="item.icon || 'Document'" />
                         </el-icon>
                         <span v-if="!sidebarCollapsed" class="menu-name">{{ item.name }}</span>
                     </router-link>
                 </template>
+
+                <el-empty
+                    v-if="!normalizedMenus.length"
+                    description="暂无菜单权限"
+                    :image-size="72"
+                    class="menu-empty"
+                />
             </nav>
         </aside>
 
-        <!-- 主内容区 -->
         <div class="main-container" :class="{ collapsed: sidebarCollapsed }">
-            <!-- 顶部导航 -->
             <header class="header">
                 <el-button class="toggle-btn" @click="toggleSidebar" link>
                     <el-icon :size="20">
@@ -72,10 +88,8 @@
                 </div>
             </header>
 
-            <!-- 标签页 -->
             <TagsView />
 
-            <!-- 内容区域 -->
             <main class="content">
                 <router-view />
             </main>
@@ -84,11 +98,38 @@
 </template>
 
 <script>
-import menuConfig from '@/config/menuConfig.js'
 import TagsView from '@/components/TagsView.vue'
 import { useAuthStore } from '@/stores/auth'
 import { ArrowDown, Fold, Expand, ArrowRight } from '@element-plus/icons-vue'
 import sidebarLogo from '@/assets/login-logo.jpg'
+
+function normalizeMenuTree(menus = []) {
+    return (menus || [])
+        .filter(item => item && item.menuType !== 3 && item.visible !== 0 && item.status !== 0 && item.path)
+        .map(item => ({
+            id: item.id,
+            path: item.path,
+            name: item.name,
+            icon: item.icon,
+            routeName: item.routeName,
+            children: normalizeMenuTree(item.children || [])
+        }))
+}
+
+function collectExpandedGroups(menus, currentPath, groups = []) {
+    for (const item of menus) {
+        if (!item.children || !item.children.length) continue
+
+        const childMatched = item.children.some(child => currentPath === child.path || currentPath.startsWith(`${child.path}/`))
+        if (childMatched) {
+            groups.push(item.path)
+        }
+
+        collectExpandedGroups(item.children, currentPath, groups)
+    }
+
+    return groups
+}
 
 export default {
     name: 'BasicLayout',
@@ -103,8 +144,7 @@ export default {
         return {
             sidebarCollapsed: false,
             sidebarLogo,
-            menuList: menuConfig,
-            expandedGroups: ['trade'] // 默认展开交易集市
+            expandedGroups: []
         }
     },
     computed: {
@@ -119,6 +159,23 @@ export default {
         },
         displayInitial() {
             return this.displayName ? this.displayName.charAt(0) : '管'
+        },
+        normalizedMenus() {
+            return normalizeMenuTree(this.authStore.currentMenus)
+        }
+    },
+    watch: {
+        '$route.path': {
+            handler(path) {
+                this.syncExpandedGroups(path)
+            },
+            immediate: true
+        },
+        normalizedMenus: {
+            handler() {
+                this.syncExpandedGroups(this.$route.path)
+            },
+            deep: true
         }
     },
     methods: {
@@ -132,6 +189,10 @@ export default {
             } else {
                 this.expandedGroups.push(path)
             }
+        },
+        syncExpandedGroups(currentPath) {
+            const nextGroups = collectExpandedGroups(this.normalizedMenus, currentPath, [])
+            this.expandedGroups = Array.from(new Set(nextGroups))
         },
         async handleCommand(command) {
             if (command !== 'logout') return
@@ -207,6 +268,10 @@ export default {
     padding: 8px 0;
     overflow-y: auto;
     flex: 1;
+}
+
+.menu-empty {
+    margin-top: 48px;
 }
 
 .menu::-webkit-scrollbar {

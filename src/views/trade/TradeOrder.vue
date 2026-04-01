@@ -71,6 +71,7 @@
           <div class="order-actions">
             <el-button
               v-if="item.status === 'pending'"
+              v-permission="['trade:order:receive', 'trade:order:view']"
               type="primary"
               size="small"
               :loading="isActionLoading(item.id, 'receive')"
@@ -80,6 +81,7 @@
             </el-button>
             <el-button
               v-if="item.status === 'progress'"
+              v-permission="['trade:order:complete', 'trade:order:view']"
               type="success"
               size="small"
               :loading="isActionLoading(item.id, 'complete')"
@@ -89,6 +91,7 @@
             </el-button>
             <el-button
               v-if="item.status === 'pending'"
+              v-permission="['trade:order:cancel', 'trade:order:view']"
               type="danger"
               size="small"
               plain
@@ -98,7 +101,7 @@
               取消订单
             </el-button>
             <el-button size="small" plain @click="handleViewDetail(item)">查看详情</el-button>
-            <el-button size="small" plain @click="handleContact">联系对方</el-button>
+            <el-button v-permission="['chat:contact', 'chat:view']" size="small" plain @click="handleContact">联系对方</el-button>
           </div>
         </el-card>
       </template>

@@ -14,14 +14,18 @@ function normalizePageQuery(params = {}) {
 
 export function loginUser(data = {}) {
   const { username, password } = data
+  const formData = new URLSearchParams()
+
+  formData.append('username', username || '')
+  formData.append('password', password || '')
 
   return request({
     url: '/user/login',
     method: 'post',
-    params: {
-      username,
-      password
-    }
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded'
+    },
+    data: formData
   })
 }
 

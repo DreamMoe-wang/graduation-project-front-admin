@@ -1,5 +1,7 @@
 const TOKEN_KEY = 'admin-token'
 const USER_KEY = 'admin-user'
+const MENU_KEY = 'admin-menus'
+const PERMISSION_KEY = 'admin-permissions'
 const DEV_BYPASS_TOKEN = '__DEV_BYPASS_TOKEN__'
 
 function safeLocalStorage() {
@@ -62,6 +64,68 @@ export function clearAuthStorage() {
 
   storage.removeItem(TOKEN_KEY)
   storage.removeItem(USER_KEY)
+  storage.removeItem(MENU_KEY)
+  storage.removeItem(PERMISSION_KEY)
+}
+
+export function getStoredMenus() {
+  const storage = safeLocalStorage()
+
+  if (!storage) return []
+
+  const value = storage.getItem(MENU_KEY)
+
+  if (!value) return []
+
+  try {
+    const parsed = JSON.parse(value)
+    return Array.isArray(parsed) ? parsed : []
+  } catch (error) {
+    storage.removeItem(MENU_KEY)
+    return []
+  }
+}
+
+export function setStoredMenus(menus) {
+  const storage = safeLocalStorage()
+
+  if (!storage) return
+
+  if (Array.isArray(menus) && menus.length) {
+    storage.setItem(MENU_KEY, JSON.stringify(menus))
+  } else {
+    storage.removeItem(MENU_KEY)
+  }
+}
+
+export function getStoredPermissions() {
+  const storage = safeLocalStorage()
+
+  if (!storage) return []
+
+  const value = storage.getItem(PERMISSION_KEY)
+
+  if (!value) return []
+
+  try {
+    const parsed = JSON.parse(value)
+    return Array.isArray(parsed) ? parsed : []
+  } catch (error) {
+    storage.removeItem(PERMISSION_KEY)
+    return []
+  }
+}
+
+export function setStoredPermissions(permissions) {
+  const storage = safeLocalStorage()
+
+  if (!storage) return
+
+  if (Array.isArray(permissions) && permissions.length) {
+    storage.setItem(PERMISSION_KEY, JSON.stringify(permissions))
+  } else {
+    storage.removeItem(PERMISSION_KEY)
+  }
 }
 
 export function createDevBypassToken() {

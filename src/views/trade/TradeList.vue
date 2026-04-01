@@ -47,7 +47,7 @@
                     <span class="page-title">交易大全</span>
                 </div>
                 <div class="header-right">
-                    <el-button type="success" @click="handleExport">
+                    <el-button v-permission="['trade:list:export', 'trade:list:view']" type="success" @click="handleExport">
                         <el-icon>
                             <Download />
                         </el-icon>
@@ -97,10 +97,10 @@
                                 <el-button type="primary" size="small" @click="handleViewDetail(item)">
                                     详情
                                 </el-button>
-                                <el-button type="warning" size="small" @click="handleEdit(item)">
+                                <el-button v-permission="['trade:publish:edit', 'trade:publish:view']" type="warning" size="small" @click="handleEdit(item)">
                                     编辑
                                 </el-button>
-                                <el-button type="danger" size="small" @click="handleDelete(item)">
+                                <el-button v-permission="['trade:publish:delete', 'trade:publish:view']" type="danger" size="small" @click="handleDelete(item)">
                                     删除
                                 </el-button>
                             </div>

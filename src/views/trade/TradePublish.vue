@@ -48,7 +48,7 @@
           <span class="page-title">交易管理</span>
         </div>
         <div class="header-right">
-          <el-button type="primary" @click="handleAdd">
+          <el-button v-permission="['trade:publish:create', 'trade:publish:view']" type="primary" @click="handleAdd">
             <el-icon>
               <Plus />
             </el-icon>
@@ -88,10 +88,10 @@
             <el-button link type="primary" size="small" @click="handleViewDetail(row)">
               详情
             </el-button>
-            <el-button link type="warning" size="small" @click="handleEdit(row)">
+            <el-button v-permission="['trade:publish:edit', 'trade:publish:view']" link type="warning" size="small" @click="handleEdit(row)">
               编辑
             </el-button>
-            <el-button link type="danger" size="small" @click="handleDelete(row)">
+            <el-button v-permission="['trade:publish:delete', 'trade:publish:view']" link type="danger" size="small" @click="handleDelete(row)">
               删除
             </el-button>
           </template>

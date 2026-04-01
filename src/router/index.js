@@ -1,4 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router'
+import { ElMessage } from 'element-plus'
 import BasicLayout from '@/layouts/BasicLayout.vue'
 import { pinia } from '@/stores'
 import { useAuthStore } from '@/stores/auth'
@@ -33,13 +34,13 @@ const routes = [
         path: 'trade/publish/create',
         name: 'TradePublishCreate',
         component: () => import('@/views/trade/TradePublishForm.vue'),
-        meta: { title: '创建交易' }
+        meta: { title: '创建交易', menuPath: '/trade/publish' }
       },
       {
         path: 'trade/publish/edit/:id',
         name: 'TradePublishEdit',
         component: () => import('@/views/trade/TradePublishForm.vue'),
-        meta: { title: '编辑交易' }
+        meta: { title: '编辑交易', menuPath: '/trade/publish' }
       },
       {
         path: 'trade/list',
@@ -110,6 +111,33 @@ const router = createRouter({
   routes
 })
 
+function collectAccessibleMenuPaths(menus = [], result = []) {
+  for (const item of menus || []) {
+    if (!item) continue
+
+    const hasChildren = Array.isArray(item.children) && item.children.length > 0
+    const isPageMenu = item.menuType === 2 && item.path
+
+    if (isPageMenu) {
+      result.push(item.path)
+    }
+
+    if (hasChildren) {
+      collectAccessibleMenuPaths(item.children, result)
+    }
+  }
+
+  return result
+}
+
+function resolveRedirectPath(allowedPaths = []) {
+  if (allowedPaths.includes('/')) {
+    return '/'
+  }
+
+  return allowedPaths[0] || '/'
+}
+
 router.beforeEach(async to => {
   const authStore = useAuthStore(pinia)
   const isPublicPage = !!to.meta.public
@@ -137,6 +165,18 @@ router.beforeEach(async to => {
       query: {
         redirect: to.fullPath
       }
+    }
+  }
+
+  const allowedPaths = Array.from(new Set(collectAccessibleMenuPaths(authStore.currentMenus)))
+  const requiredMenuPath = typeof to.meta.menuPath === 'string' ? to.meta.menuPath : to.path
+
+  if (requiredMenuPath && !allowedPaths.includes(requiredMenuPath)) {
+    const redirectPath = resolveRedirectPath(allowedPaths)
+
+    if (to.path !== redirectPath) {
+      ElMessage.warning('你当前没有访问该页面的权限')
+      return redirectPath
     }
   }
 

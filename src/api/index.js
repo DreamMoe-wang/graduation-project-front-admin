@@ -1,4 +1,5 @@
 export * from './dashboard'
+export * from './auth'
 export * from './tradePublish'
 export * from './tradeList'
 export * from './tradeOrder'
