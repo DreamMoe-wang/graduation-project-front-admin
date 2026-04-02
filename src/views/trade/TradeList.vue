@@ -133,8 +133,7 @@
         <!-- 详情对话框 -->
         <el-dialog v-model="detailVisible" title="交易详情" width="700px">
             <el-descriptions :column="2" border v-if="currentRow">
-                <el-descriptions-item label="交易 ID">{{ currentRow.id }}</el-descriptions-item>
-                <el-descriptions-item label="交易状态">
+                <el-descriptions-item label="交易状态" :span="2">
                     <el-tag :type="getStatusType(currentRow.status)" size="small">
                         {{ getStatusText(currentRow.status) }}
                     </el-tag>

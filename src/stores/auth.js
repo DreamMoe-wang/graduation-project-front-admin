@@ -85,6 +85,17 @@ function createDevMenus() {
       component: 'chat/ChatRoom',
       icon: 'ChatDotRound',
       children: []
+    },
+    {
+      id: 1030,
+      parentId: 0,
+      name: '个人中心',
+      menuType: 2,
+      path: '/profile',
+      routeName: 'ProfileCenter',
+      component: 'profile/ProfileCenter',
+      icon: 'UserFilled',
+      children: []
     }
   ]
 }
@@ -116,6 +127,7 @@ function createDevBypassUser() {
       'trade:order:cancel',
       'chat:view',
       'chat:contact',
+      'profile:view',
       'trade:review',
       'user:manage',
       'role:manage',

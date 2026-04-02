@@ -1,5 +1,6 @@
 export * from './dashboard'
 export * from './auth'
+export * from './oss'
 export * from './tradePublish'
 export * from './tradeList'
 export * from './tradeOrder'

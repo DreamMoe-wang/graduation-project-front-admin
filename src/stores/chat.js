@@ -30,8 +30,12 @@ export const useChatStore = defineStore('chat', {
     setMessageInput(value) {
       this.messageInput = value
     },
-    async fetchSessions(preserveSelection = true) {
-      this.loadingSessions = true
+    async fetchSessions(preserveSelection = true, options = {}) {
+      const { silent = false } = options
+
+      if (!silent) {
+        this.loadingSessions = true
+      }
 
       try {
         const keyword = this.searchKeyword.trim()
@@ -57,7 +61,9 @@ export const useChatStore = defineStore('chat', {
         this.messageList = []
         throw error
       } finally {
-        this.loadingSessions = false
+        if (!silent) {
+          this.loadingSessions = false
+        }
       }
     },
     async selectSession(session) {
@@ -119,7 +125,7 @@ export const useChatStore = defineStore('chat', {
 
         await Promise.all([
           this.fetchMessages(this.currentSessionId),
-          this.fetchSessions(true)
+          this.fetchSessions(true, { silent: true })
         ])
 
         return true
@@ -132,7 +138,7 @@ export const useChatStore = defineStore('chat', {
 
       await Promise.all([
         this.fetchMessages(this.currentSessionId),
-        this.fetchSessions(true)
+        this.fetchSessions(true, { silent: true })
       ])
     }
   }

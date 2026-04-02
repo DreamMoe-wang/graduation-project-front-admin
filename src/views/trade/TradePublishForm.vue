@@ -28,12 +28,12 @@
           <el-input v-model="formData.title" placeholder="请输入交易标题" />
         </el-form-item>
 
-        <el-form-item label="委托人" prop="clientName">
-          <el-input v-model="formData.clientName" placeholder="请输入委托人姓名" />
+        <el-form-item label="委托人">
+          <el-input v-model="formData.clientName" disabled />
         </el-form-item>
 
         <el-form-item label="委托人电话" prop="clientPhone">
-          <el-input v-model="formData.clientPhone" placeholder="请输入联系方式" maxlength="11" />
+          <el-input v-model="formData.clientPhone" disabled />
         </el-form-item>
 
         <el-form-item label="交易金额" prop="amount">
@@ -84,6 +84,7 @@ import { onMounted, onUnmounted, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
+import { useAuthStore } from '@/stores/auth'
 import { useTradePublishEditorStore } from '@/stores/tradePublishEditor'
 import { emitCloseTag } from '@/utils/tags'
 
@@ -92,12 +93,9 @@ const formRules = {
     { required: true, message: '请输入交易标题', trigger: 'blur' },
     { min: 2, max: 50, message: '长度在 2 到 50 个字符', trigger: 'blur' }
   ],
-  clientName: [
-    { required: true, message: '请输入委托人姓名', trigger: 'blur' }
-  ],
   clientPhone: [
-    { required: true, message: '请输入委托人电话', trigger: 'blur' },
-    { pattern: /^1[3-9]\d{9}$/, message: '请输入正确的手机号', trigger: 'blur' }
+    { required: true, message: '当前个人信息中缺少手机号，请先前往个人中心完善', trigger: 'change' },
+    { pattern: /^1[3-9]\d{9}$/, message: '当前手机号格式不正确，请先前往个人中心完善', trigger: 'change' }
   ],
   amount: [
     { required: true, message: '请输入交易金额', trigger: 'blur' }
@@ -107,6 +105,7 @@ const formRules = {
 export default {
   name: 'TradePublishForm',
   setup() {
+    const authStore = useAuthStore()
     const store = useTradePublishEditorStore()
     const route = useRoute()
     const router = useRouter()
@@ -122,6 +121,8 @@ export default {
           await store.initEdit(id)
         } else {
           store.initCreate()
+          formData.value.clientName = authStore.displayName
+          formData.value.clientPhone = authStore.currentUser?.phone || ''
         }
       } catch (error) {
         console.error('初始化交易表单失败:', error)

@@ -81,6 +81,7 @@
                         </div>
                         <template #dropdown>
                             <el-dropdown-menu>
+                                <el-dropdown-item command="profile">个人中心</el-dropdown-item>
                                 <el-dropdown-item command="logout">退出登录</el-dropdown-item>
                             </el-dropdown-menu>
                         </template>
@@ -195,6 +196,11 @@ export default {
             this.expandedGroups = Array.from(new Set(nextGroups))
         },
         async handleCommand(command) {
+            if (command === 'profile') {
+                this.$router.push('/profile')
+                return
+            }
+
             if (command !== 'logout') return
 
             try {

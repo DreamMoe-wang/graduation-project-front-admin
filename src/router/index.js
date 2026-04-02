@@ -61,6 +61,12 @@ const routes = [
         meta: { title: '聊天室' }
       },
       {
+        path: 'profile',
+        name: 'ProfileCenter',
+        component: () => import('@/views/profile/ProfileCenter.vue'),
+        meta: { title: '个人中心' }
+      },
+      {
         path: 'user',
         name: 'UserManage',
         component: () => import('@/views/user/UserManage.vue'),

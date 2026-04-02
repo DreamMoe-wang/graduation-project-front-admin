@@ -36,6 +36,21 @@ export function getUserDetail(id) {
   })
 }
 
+export function getCurrentUserProfile() {
+  return request({
+    url: '/user/profile/current',
+    method: 'get'
+  })
+}
+
+export function updateCurrentUserProfile(data) {
+  return request({
+    url: '/user/profile/current',
+    method: 'put',
+    data
+  })
+}
+
 export function getUserPage(params) {
   return request({
     url: '/user/page',

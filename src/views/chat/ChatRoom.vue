@@ -132,11 +132,12 @@
 </template>
 
 <script>
-import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { FolderOpened, Picture, RefreshRight, Search } from '@element-plus/icons-vue'
+import { getToken } from '@/utils/auth'
 import { useChatStore } from '@/stores/chat'
 
 export default {
@@ -159,11 +160,21 @@ export default {
             messageList,
             loadingSessions,
             loadingMessages,
-            sending,
+            sending: storeSending,
             currentSession
         } = storeToRefs(store)
 
+        const wsSending = ref(false)
+        const wsConnected = ref(false)
+        const sending = computed(() => storeSending.value || wsSending.value)
+        const pendingAcks = new Map()
+
         let searchTimer = null
+        let reconnectTimer = null
+        let heartbeatTimer = null
+        let reconnectAttempts = 0
+        let manualClose = false
+        let chatSocket = null
 
         const scrollToBottom = () => {
             const container = messageListRef.value
@@ -175,11 +186,203 @@ export default {
 
         const getDisplayInitial = name => (name ? name.charAt(0) : '?')
 
+        const buildChatSocketUrl = () => {
+            if (typeof window === 'undefined') return ''
+
+            const token = getToken()
+            if (!token) return ''
+
+            const configuredBase = process.env.VUE_APP_BASE_API
+                || (process.env.NODE_ENV === 'development' ? 'http://localhost:9090/api' : '/api')
+            const httpBase = configuredBase.startsWith('http')
+                ? configuredBase
+                : `${window.location.origin}${configuredBase}`
+            const wsBase = httpBase.replace(/^http/i, 'ws').replace(/\/$/, '')
+
+            return `${wsBase}/ws/chat?token=${encodeURIComponent(token)}`
+        }
+
+        const settlePendingAck = (clientMessageId, success) => {
+            if (!clientMessageId) return
+
+            const pending = pendingAcks.get(clientMessageId)
+            if (!pending) return
+
+            clearTimeout(pending.timeout)
+            pending.resolve(success)
+            pendingAcks.delete(clientMessageId)
+        }
+
+        const clearPendingAcks = success => {
+            pendingAcks.forEach(item => {
+                clearTimeout(item.timeout)
+                item.resolve(success)
+            })
+            pendingAcks.clear()
+        }
+
+        const stopHeartbeat = () => {
+            if (heartbeatTimer) {
+                clearInterval(heartbeatTimer)
+                heartbeatTimer = null
+            }
+        }
+
+        const startHeartbeat = () => {
+            stopHeartbeat()
+            heartbeatTimer = setInterval(() => {
+                if (!chatSocket || chatSocket.readyState !== WebSocket.OPEN) return
+                chatSocket.send(JSON.stringify({ type: 'ping' }))
+            }, 25000)
+        }
+
+        const scheduleReconnect = () => {
+            if (manualClose) return
+
+            if (reconnectTimer) {
+                clearTimeout(reconnectTimer)
+            }
+
+            const delay = Math.min(15000, 1000 * Math.pow(2, reconnectAttempts))
+            reconnectAttempts += 1
+            reconnectTimer = setTimeout(() => {
+                connectWebSocket()
+            }, delay)
+        }
+
+        const handleRealtimeUpdate = async sessionId => {
+            try {
+                const tasks = [store.fetchSessions(true, { silent: true })]
+                if (currentSessionId.value && Number(currentSessionId.value) === Number(sessionId)) {
+                    tasks.push(store.fetchMessages(currentSessionId.value))
+                }
+                await Promise.all(tasks)
+            } catch (error) {
+                console.error('Realtime chat refresh failed:', error)
+            }
+        }
+
+        const handleSocketMessage = payload => {
+            let data = null
+            try {
+                data = JSON.parse(payload)
+            } catch (error) {
+                return
+            }
+
+            const type = data?.type
+            const clientMessageId = data?.clientMessageId
+
+            if (type === 'send_ack') {
+                settlePendingAck(clientMessageId, true)
+                return
+            }
+
+            if (type === 'error') {
+                settlePendingAck(clientMessageId, false)
+                ElMessage.error(data?.message || '消息发送失败')
+                return
+            }
+
+            if (type === 'session_updated') {
+                handleRealtimeUpdate(data?.sessionId)
+            }
+        }
+
+        const connectWebSocket = () => {
+            if (typeof window === 'undefined') return
+
+            if (chatSocket && (chatSocket.readyState === WebSocket.OPEN || chatSocket.readyState === WebSocket.CONNECTING)) {
+                return
+            }
+
+            const wsUrl = buildChatSocketUrl()
+            if (!wsUrl) return
+
+            const socket = new WebSocket(wsUrl)
+            chatSocket = socket
+
+            socket.onopen = () => {
+                wsConnected.value = true
+                reconnectAttempts = 0
+                startHeartbeat()
+            }
+
+            socket.onmessage = event => {
+                handleSocketMessage(event.data)
+            }
+
+            socket.onclose = () => {
+                wsConnected.value = false
+                stopHeartbeat()
+                clearPendingAcks(false)
+                if (chatSocket === socket) {
+                    chatSocket = null
+                }
+                scheduleReconnect()
+            }
+
+            socket.onerror = () => {
+                // close event will handle reconnect
+            }
+        }
+
+        const disconnectWebSocket = () => {
+            manualClose = true
+            wsConnected.value = false
+            stopHeartbeat()
+            clearPendingAcks(false)
+
+            if (reconnectTimer) {
+                clearTimeout(reconnectTimer)
+                reconnectTimer = null
+            }
+
+            if (chatSocket) {
+                try {
+                    chatSocket.close()
+                } catch (error) {
+                    console.error('Close chat websocket failed:', error)
+                } finally {
+                    chatSocket = null
+                }
+            }
+        }
+
+        const sendByWebSocket = async (sessionId, content) => {
+            if (!chatSocket || chatSocket.readyState !== WebSocket.OPEN || !wsConnected.value) {
+                return false
+            }
+
+            const clientMessageId = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
+            const ackPromise = new Promise(resolve => {
+                const timeout = setTimeout(() => {
+                    pendingAcks.delete(clientMessageId)
+                    resolve(false)
+                }, 6000)
+                pendingAcks.set(clientMessageId, { resolve, timeout })
+            })
+
+            try {
+                chatSocket.send(JSON.stringify({
+                    type: 'send',
+                    sessionId,
+                    content,
+                    clientMessageId
+                }))
+            } catch (error) {
+                settlePendingAck(clientMessageId, false)
+                return false
+            }
+
+            return ackPromise
+        }
+
         const fetchSessions = async preserveSelection => {
             try {
                 await store.fetchSessions(preserveSelection)
             } catch (error) {
-                console.error('获取会话列表失败:', error)
+                console.error('Fetch chat sessions failed:', error)
             }
         }
 
@@ -187,15 +390,34 @@ export default {
             try {
                 await store.selectSession(session)
             } catch (error) {
-                console.error('切换会话失败:', error)
+                console.error('Switch chat session failed:', error)
             }
         }
 
         const sendMessage = async () => {
+            const content = (messageInput.value || '').trim()
+            const sessionId = currentSessionId.value
+            if (!content || !sessionId) return
+
+            wsSending.value = true
             try {
+                const canUseWs = chatSocket && chatSocket.readyState === WebSocket.OPEN && wsConnected.value
+                if (canUseWs) {
+                    const sentByWs = await sendByWebSocket(sessionId, content)
+                    if (sentByWs) {
+                        messageInput.value = ''
+                        await handleRealtimeUpdate(sessionId)
+                    } else {
+                        ElMessage.error('实时发送失败，请重试')
+                    }
+                    return
+                }
+
                 await store.sendCurrentMessage()
             } catch (error) {
-                console.error('发送消息失败:', error)
+                console.error('Send chat message failed:', error)
+            } finally {
+                wsSending.value = false
             }
         }
 
@@ -203,7 +425,7 @@ export default {
             try {
                 await store.refreshCurrentSession()
             } catch (error) {
-                console.error('刷新会话失败:', error)
+                console.error('Refresh chat session failed:', error)
             }
         }
 
@@ -236,11 +458,13 @@ export default {
         )
 
         onMounted(() => {
-            const tradeId = route.query.tradeId
+            manualClose = false
+            connectWebSocket()
 
+            const tradeId = route.query.tradeId
             if (tradeId) {
                 store.openTradeSessionByTradeId(tradeId).catch(error => {
-                    console.error('打开交易私聊会话失败:', error)
+                    console.error('Open trade chat session failed:', error)
                 })
                 return
             }
@@ -256,7 +480,7 @@ export default {
                 try {
                     await store.openTradeSessionByTradeId(tradeId)
                 } catch (error) {
-                    console.error('打开交易私聊会话失败:', error)
+                    console.error('Open trade chat session failed:', error)
                 }
             }
         )
@@ -266,6 +490,7 @@ export default {
                 clearTimeout(searchTimer)
                 searchTimer = null
             }
+            disconnectWebSocket()
         })
 
         return {
@@ -278,6 +503,7 @@ export default {
             loadingSessions,
             loadingMessages,
             sending,
+            wsConnected,
             currentSession,
             selectSession,
             sendMessage,
