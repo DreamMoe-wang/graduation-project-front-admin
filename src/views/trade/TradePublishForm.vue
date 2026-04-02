@@ -60,7 +60,7 @@
         <el-button @click="handleCancel">取消</el-button>
         <el-button
           type="info"
-          v-permission="['trade:publish:save', 'trade:publish:view']"
+          v-permission="'trade:publish:view'"
           :loading="submitLoading && pendingAction === 'draft'"
           @click="handleSaveDraft"
         >
@@ -68,7 +68,7 @@
         </el-button>
         <el-button
           type="primary"
-          v-permission="['trade:publish:submit', 'trade:publish:view']"
+          v-permission="'trade:publish:view'"
           :loading="submitLoading && pendingAction === 'auditing'"
           @click="handleSubmitAudit"
         >

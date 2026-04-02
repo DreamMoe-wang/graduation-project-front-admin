@@ -134,6 +134,7 @@
 <script>
 import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
+import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { FolderOpened, Picture, RefreshRight, Search } from '@element-plus/icons-vue'
 import { useChatStore } from '@/stores/chat'
@@ -148,6 +149,7 @@ export default {
     },
     setup() {
         const store = useChatStore()
+        const route = useRoute()
         const messageListRef = ref(null)
         const {
             searchKeyword,
@@ -234,8 +236,30 @@ export default {
         )
 
         onMounted(() => {
+            const tradeId = route.query.tradeId
+
+            if (tradeId) {
+                store.openTradeSessionByTradeId(tradeId).catch(error => {
+                    console.error('打开交易私聊会话失败:', error)
+                })
+                return
+            }
+
             fetchSessions(false)
         })
+
+        watch(
+            () => route.query.tradeId,
+            async tradeId => {
+                if (!tradeId) return
+
+                try {
+                    await store.openTradeSessionByTradeId(tradeId)
+                } catch (error) {
+                    console.error('打开交易私聊会话失败:', error)
+                }
+            }
+        )
 
         onBeforeUnmount(() => {
             if (searchTimer) {

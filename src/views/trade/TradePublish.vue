@@ -47,17 +47,56 @@
         <div class="header-left">
           <span class="page-title">交易管理</span>
         </div>
-        <div class="header-right">
-          <el-button v-permission="['trade:publish:create', 'trade:publish:view']" type="primary" @click="handleAdd">
+      </div>
+
+      <div class="action-toolbar">
+        <div class="toolbar-left">
+          <span class="selection-hint">已选 {{ selectedRows.length }} 项</span>
+        </div>
+        <div class="toolbar-right">
+          <el-button
+            v-permission="'trade:publish:view'"
+            type="primary"
+            @click="handleAdd"
+          >
             <el-icon>
               <Plus />
             </el-icon>
             发布交易
           </el-button>
+          <el-button
+            v-permission="'trade:review'"
+            type="success"
+            :disabled="!selectedAuditableIds.length"
+            :loading="auditLoading && auditAction === 'approve'"
+            @click="handleBatchApprove"
+          >
+            批量通过
+          </el-button>
+          <el-button
+            v-permission="'trade:review'"
+            type="warning"
+            :disabled="!selectedAuditableIds.length"
+            :loading="auditLoading && auditAction === 'reject'"
+            @click="handleBatchReject"
+          >
+            批量驳回
+          </el-button>
         </div>
       </div>
 
-      <el-table :data="tableData" border style="width: 100%" v-loading="loading">
+      <el-table
+        :data="tableData"
+        border
+        style="width: 100%"
+        v-loading="loading"
+        @selection-change="handleSelectionChange"
+      >
+        <el-table-column
+          type="selection"
+          width="54"
+          :selectable="isRowSelectable"
+        />
         <el-table-column prop="title" label="标题" min-width="180" show-overflow-tooltip />
         <el-table-column prop="clientName" label="委托人" width="100" />
         <el-table-column prop="clientPhone" label="委托人电话" width="130" />
@@ -88,10 +127,30 @@
             <el-button link type="primary" size="small" @click="handleViewDetail(row)">
               详情
             </el-button>
-            <el-button v-permission="['trade:publish:edit', 'trade:publish:view']" link type="warning" size="small" @click="handleEdit(row)">
+            <el-button
+              v-if="row.status === 'auditing'"
+              v-permission="'trade:review'"
+              link
+              type="success"
+              size="small"
+              @click="handleApprove(row)"
+            >
+              通过
+            </el-button>
+            <el-button
+              v-if="row.status === 'auditing'"
+              v-permission="'trade:review'"
+              link
+              type="warning"
+              size="small"
+              @click="handleReject(row)"
+            >
+              驳回
+            </el-button>
+            <el-button v-permission="'trade:publish:view'" link type="warning" size="small" @click="handleEdit(row)">
               编辑
             </el-button>
-            <el-button v-permission="['trade:publish:delete', 'trade:publish:view']" link type="danger" size="small" @click="handleDelete(row)">
+            <el-button v-permission="'trade:publish:view'" link type="danger" size="small" @click="handleDelete(row)">
               删除
             </el-button>
           </template>
@@ -142,7 +201,7 @@
 </template>
 
 <script>
-import { onMounted, onUnmounted } from 'vue'
+import { computed, onMounted, onUnmounted } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
@@ -171,8 +230,15 @@ export default {
       loading,
       pagination,
       detailVisible,
-      currentRow
+      currentRow,
+      selectedRows,
+      auditLoading,
+      auditAction
     } = storeToRefs(store)
+
+    const selectedAuditableIds = computed(() => selectedRows.value
+      .filter(item => store.isAuditable(item))
+      .map(item => item.id))
 
     const handleSearch = async () => {
       try {
@@ -219,6 +285,92 @@ export default {
       } catch (error) {
         if (error !== 'cancel' && error !== 'close') {
           console.error('删除交易失败:', error)
+        }
+      }
+    }
+
+    const handleSelectionChange = rows => {
+      store.setSelectedRows(rows)
+    }
+
+    const isRowSelectable = row => store.isAuditable(row)
+
+    const handleApprove = async row => {
+      try {
+        await ElMessageBox.confirm(`确认通过交易"${row.title}"的审核吗？`, '审核确认', {
+          confirmButtonText: '确定',
+          cancelButtonText: '取消',
+          type: 'success'
+        })
+
+        await store.auditRows([row.id], 'approve')
+        ElMessage.success('审核通过')
+      } catch (error) {
+        if (error !== 'cancel' && error !== 'close') {
+          console.error('交易审核通过失败:', error)
+        }
+      }
+    }
+
+    const handleReject = async row => {
+      try {
+        const { value } = await ElMessageBox.prompt('请输入驳回说明（可选）', '审核驳回', {
+          confirmButtonText: '确定',
+          cancelButtonText: '取消',
+          inputPlaceholder: '例如：信息不完整，请补充后重新提交',
+          inputValue: ''
+        })
+
+        await store.auditRows([row.id], 'reject', value || '')
+        ElMessage.success('已驳回')
+      } catch (error) {
+        if (error !== 'cancel' && error !== 'close') {
+          console.error('交易审核驳回失败:', error)
+        }
+      }
+    }
+
+    const handleBatchApprove = async () => {
+      if (!selectedAuditableIds.value.length) {
+        ElMessage.warning('请先勾选待审核的交易')
+        return
+      }
+
+      try {
+        await ElMessageBox.confirm(`确认批量通过 ${selectedAuditableIds.value.length} 条交易吗？`, '批量审核', {
+          confirmButtonText: '确定',
+          cancelButtonText: '取消',
+          type: 'success'
+        })
+
+        await store.auditRows(selectedAuditableIds.value, 'approve')
+        ElMessage.success('批量审核通过完成')
+      } catch (error) {
+        if (error !== 'cancel' && error !== 'close') {
+          console.error('批量审核通过失败:', error)
+        }
+      }
+    }
+
+    const handleBatchReject = async () => {
+      if (!selectedAuditableIds.value.length) {
+        ElMessage.warning('请先勾选待审核的交易')
+        return
+      }
+
+      try {
+        const { value } = await ElMessageBox.prompt('请输入批量驳回说明（可选）', '批量驳回', {
+          confirmButtonText: '确定',
+          cancelButtonText: '取消',
+          inputPlaceholder: '例如：请补充交易描述后重新提交',
+          inputValue: ''
+        })
+
+        await store.auditRows(selectedAuditableIds.value, 'reject', value || '')
+        ElMessage.success('批量驳回完成')
+      } catch (error) {
+        if (error !== 'cancel' && error !== 'close') {
+          console.error('批量审核驳回失败:', error)
         }
       }
     }
@@ -272,11 +424,21 @@ export default {
       handleEdit,
       handleViewDetail,
       handleDelete,
+      handleSelectionChange,
+      isRowSelectable,
+      handleApprove,
+      handleReject,
+      handleBatchApprove,
+      handleBatchReject,
       handleSizeChange,
       handleCurrentChange,
       handleDetailClose,
       formatAmount,
       statusOptions: TRADE_STATUS_OPTIONS,
+      selectedRows,
+      selectedAuditableIds,
+      auditLoading,
+      auditAction,
       getStatusType,
       getStatusText
     }
@@ -300,7 +462,6 @@ export default {
 
 .table-header {
   display: flex;
-  justify-content: space-between;
   align-items: center;
   margin-bottom: 16px;
 }
@@ -320,6 +481,31 @@ export default {
 .header-right {
   display: flex;
   align-items: center;
+}
+
+.action-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.toolbar-left {
+  color: #6b7280;
+  font-size: 14px;
+}
+
+.toolbar-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.selection-hint {
+  line-height: 32px;
 }
 
 .pagination {

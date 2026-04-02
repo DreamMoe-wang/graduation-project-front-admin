@@ -41,3 +41,10 @@ export function exportTradeList(params) {
     params: normalizeTradeQuery(params)
   })
 }
+
+export function receiveTradeList(id) {
+  return request({
+    url: `/trade/list/${id}/receive`,
+    method: 'post'
+  })
+}

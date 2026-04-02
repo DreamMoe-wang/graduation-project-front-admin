@@ -3,6 +3,7 @@ import {
   getChatMessages,
   getChatSessions,
   markChatSessionRead,
+  openTradeChatSession,
   sendChatMessage
 } from '@/api/chat'
 
@@ -70,6 +71,25 @@ export const useChatStore = defineStore('chat', {
       }
 
       await this.fetchMessages(session.id)
+    },
+    async openTradeSessionByTradeId(tradeId) {
+      if (!tradeId) return null
+
+      this.searchKeyword = ''
+
+      const session = await openTradeChatSession(tradeId)
+      await this.fetchSessions(true)
+
+      const targetSession = this.sessionList.find(item => Number(item.id) === Number(session?.id))
+
+      if (targetSession) {
+        await this.selectSession(targetSession)
+      } else if (session?.id) {
+        this.currentSessionId = session.id
+        await this.fetchMessages(session.id)
+      }
+
+      return session
     },
     async fetchMessages(sessionId = this.currentSessionId) {
       if (!sessionId) return

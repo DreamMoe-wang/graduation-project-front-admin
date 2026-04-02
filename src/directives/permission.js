@@ -13,7 +13,7 @@ function hasElementPermission(value) {
   }
 
   if (Array.isArray(value)) {
-    return authStore.hasAnyPermission(value)
+    return value.every(item => authStore.hasPermission(item))
   }
 
   if (typeof value === 'object') {
@@ -30,8 +30,8 @@ function hasElementPermission(value) {
 }
 
 function updateVisibility(el, binding) {
-  if (!el.__originDisplay) {
-    el.__originDisplay = el.style.display === 'none' ? '' : el.style.display
+  if (typeof el.__originDisplay === 'undefined') {
+    el.__originDisplay = el.style.display
   }
 
   if (hasElementPermission(binding.value)) {

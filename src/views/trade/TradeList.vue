@@ -3,12 +3,6 @@
         <!-- 搜索筛选区域 -->
         <el-card class="search-card">
             <el-form :inline="true" :model="searchForm" class="search-form" label-width="80px">
-                <el-form-item label="交易状态">
-                    <el-select v-model="searchForm.status" placeholder="请选择状态" clearable style="width: 150px">
-                        <el-option v-for="item in statusOptions" :key="item.value" :label="item.label" :value="item.value" />
-                    </el-select>
-                </el-form-item>
-
                 <el-form-item label="金额范围">
                     <div class="amount-range">
                         <el-input v-model="searchForm.minAmount" placeholder="最低" type="number" style="width: 100px" />
@@ -47,7 +41,7 @@
                     <span class="page-title">交易大全</span>
                 </div>
                 <div class="header-right">
-                    <el-button v-permission="['trade:list:export', 'trade:list:view']" type="success" @click="handleExport">
+                    <el-button v-permission="['trade:list:export', 'trade:review']" type="success" @click="handleExport">
                         <el-icon>
                             <Download />
                         </el-icon>
@@ -97,10 +91,28 @@
                                 <el-button type="primary" size="small" @click="handleViewDetail(item)">
                                     详情
                                 </el-button>
-                                <el-button v-permission="['trade:publish:edit', 'trade:publish:view']" type="warning" size="small" @click="handleEdit(item)">
+                                <el-button
+                                    v-permission="['chat:contact', 'chat:view']"
+                                    type="success"
+                                    size="small"
+                                    plain
+                                    @click="handleContact(item)"
+                                >
+                                    私聊
+                                </el-button>
+                                <el-button
+                                    v-if="item.status === 'published'"
+                                    v-permission="['trade:list:take', 'trade:order:receive']"
+                                    type="primary"
+                                    size="small"
+                                    @click="handleReceive(item)"
+                                >
+                                    接取
+                                </el-button>
+                                <el-button v-permission="['trade:list:edit', 'trade:review']" type="warning" size="small" @click="handleEdit(item)">
                                     编辑
                                 </el-button>
-                                <el-button v-permission="['trade:publish:delete', 'trade:publish:view']" type="danger" size="small" @click="handleDelete(item)">
+                                <el-button v-permission="['trade:list:delete', 'trade:review']" type="danger" size="small" @click="handleDelete(item)">
                                     删除
                                 </el-button>
                             </div>
@@ -154,7 +166,7 @@ import { storeToRefs } from 'pinia'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Search, Refresh, Download } from '@element-plus/icons-vue'
-import { getTradeStatusText, getTradeStatusType, TRADE_STATUS_OPTIONS } from '@/config/statusConfig'
+import { getTradeStatusText, getTradeStatusType } from '@/config/statusConfig'
 import { formatCurrency } from '@/utils/format'
 import { useTradeListStore } from '@/stores/tradeList'
 
@@ -198,6 +210,15 @@ export default {
             router.push(`/trade/publish/edit/${row.id}`)
         }
 
+        const handleReceive = async row => {
+            try {
+                await store.receiveById(row.id)
+                ElMessage.success('接取成功')
+            } catch (error) {
+                console.error('接取交易失败:', error)
+            }
+        }
+
         const handleDelete = async row => {
             try {
                 await ElMessageBox.confirm(`确定要删除交易"${row.title}"吗？`, '提示', {
@@ -222,6 +243,16 @@ export default {
             } catch (error) {
                 console.error('导出交易列表失败:', error)
             }
+        }
+
+        const handleContact = item => {
+            router.push({
+                path: '/chat',
+                query: {
+                    tradeId: item.id
+                }
+            })
+            ElMessage.info('已跳转到聊天室，请联系发布方')
         }
 
         const handleSizeChange = async val => {
@@ -267,12 +298,13 @@ export default {
             handleReset,
             handleViewDetail,
             handleEdit,
+            handleReceive,
             handleDelete,
             handleExport,
+            handleContact,
             handleSizeChange,
             handleCurrentChange,
             formatAmount,
-            statusOptions: TRADE_STATUS_OPTIONS,
             getStatusType,
             getStatusText
         }

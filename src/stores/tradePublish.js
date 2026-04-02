@@ -1,8 +1,10 @@
 import { defineStore } from 'pinia'
 import {
+  approveTradePublish,
   deleteTradePublish,
   getTradePublishDetail,
-  getTradePublishPage
+  getTradePublishPage,
+  rejectTradePublish
 } from '@/api/tradePublish'
 import {
   applyPageResult,
@@ -30,7 +32,10 @@ export const useTradePublishStore = defineStore('tradePublish', {
     loading: false,
     pagination: createDefaultPagination(),
     detailVisible: false,
-    currentRow: null
+    currentRow: null,
+    selectedRows: [],
+    auditLoading: false,
+    auditAction: ''
   }),
   actions: {
     async fetchData() {
@@ -69,6 +74,31 @@ export const useTradePublishStore = defineStore('tradePublish', {
       this.detailVisible = false
       this.currentRow = null
     },
+    setSelectedRows(rows) {
+      this.selectedRows = Array.isArray(rows) ? rows : []
+    },
+    clearSelectedRows() {
+      this.selectedRows = []
+    },
+    isAuditable(row) {
+      return row?.status === 'auditing'
+    },
+    async auditRows(ids, action, reviewRemark = '') {
+      const requestFn = action === 'approve' ? approveTradePublish : rejectTradePublish
+      this.auditLoading = true
+      this.auditAction = action
+
+      try {
+        for (const id of ids) {
+          await requestFn(id, reviewRemark ? { reviewRemark } : {})
+        }
+        this.clearSelectedRows()
+        await this.fetchData()
+      } finally {
+        this.auditLoading = false
+        this.auditAction = ''
+      }
+    },
     async deleteById(id) {
       await deleteTradePublish(id)
 
@@ -89,6 +119,9 @@ export const useTradePublishStore = defineStore('tradePublish', {
     resetTransientState() {
       this.detailVisible = false
       this.currentRow = null
+      this.clearSelectedRows()
+      this.auditLoading = false
+      this.auditAction = ''
     }
   }
 })

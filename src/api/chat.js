@@ -8,6 +8,13 @@ export function getChatSessions(params) {
   })
 }
 
+export function openTradeChatSession(tradeId) {
+  return request({
+    url: `/chat/trade/${tradeId}/session`,
+    method: 'post'
+  })
+}
+
 export function getChatMessages(sessionId) {
   return request({
     url: `/chat/sessions/${sessionId}/messages`,

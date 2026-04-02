@@ -72,18 +72,6 @@ function createDevMenus() {
           component: 'trade/TradeOrder',
           icon: 'Document',
           children: []
-        },
-        {
-          id: 1014,
-          parentId: 1002,
-          name: '交易审核',
-          menuType: 3,
-          path: null,
-          routeName: null,
-          component: null,
-          icon: null,
-          permissionCode: 'trade:review',
-          children: []
         }
       ]
     },
@@ -96,83 +84,6 @@ function createDevMenus() {
       routeName: 'ChatRoom',
       component: 'chat/ChatRoom',
       icon: 'ChatDotRound',
-      children: []
-    },
-    {
-      id: 1007,
-      parentId: 0,
-      name: '用户管理',
-      menuType: 2,
-      path: '/user',
-      routeName: 'UserManage',
-      component: 'user/UserManage',
-      icon: 'User',
-      children: []
-    },
-    {
-      id: 1008,
-      parentId: 0,
-      name: '角色管理',
-      menuType: 2,
-      path: '/role',
-      routeName: 'RoleManage',
-      component: 'role/RoleManage',
-      icon: 'Avatar',
-      children: []
-    },
-    {
-      id: 1009,
-      parentId: 0,
-      name: '菜单管理',
-      menuType: 2,
-      path: '/menu',
-      routeName: 'MenuManage',
-      component: 'menu/MenuManage',
-      icon: 'Menu',
-      children: []
-    },
-    {
-      id: 1010,
-      parentId: 0,
-      name: '字典管理',
-      menuType: 2,
-      path: '/dict',
-      routeName: 'DictManage',
-      component: 'dict/DictManage',
-      icon: 'Collection',
-      children: []
-    },
-    {
-      id: 1011,
-      parentId: 0,
-      name: '通知公告',
-      menuType: 2,
-      path: '/notice',
-      routeName: 'NoticeManage',
-      component: 'notice/NoticeManage',
-      icon: 'Bell',
-      children: []
-    },
-    {
-      id: 1012,
-      parentId: 0,
-      name: '日志管理',
-      menuType: 2,
-      path: '/log',
-      routeName: 'LogManage',
-      component: 'log/LogManage',
-      icon: 'Notebook',
-      children: []
-    },
-    {
-      id: 1013,
-      parentId: 0,
-      name: '系统设置',
-      menuType: 2,
-      path: '/setting',
-      routeName: 'SystemSetting',
-      component: 'setting/SystemSetting',
-      icon: 'Setting',
       children: []
     }
   ]
@@ -196,13 +107,16 @@ function createDevBypassUser() {
       'trade:publish:submit',
       'trade:list:view',
       'trade:list:export',
+      'trade:list:edit',
+      'trade:list:delete',
+      'trade:list:take',
       'trade:order:view',
       'trade:order:receive',
       'trade:order:complete',
       'trade:order:cancel',
-      'trade:review',
       'chat:view',
       'chat:contact',
+      'trade:review',
       'user:manage',
       'role:manage',
       'menu:manage',
@@ -276,13 +190,12 @@ export const useAuthStore = defineStore('auth', () => {
     const password = credentials?.password || ''
 
     if (username === 'admin' && password === '123456') {
-      const bypassToken = createDevBypassToken()
       const bypassUser = createDevBypassUser()
-      setToken(bypassToken)
+      setToken(createDevBypassToken())
       setUser(bypassUser)
       setMenus(bypassUser.menus)
       setPermissions(bypassUser.permissions)
-      return bypassToken
+      return token.value
     }
 
     const loginPayload = await loginAuth(credentials)

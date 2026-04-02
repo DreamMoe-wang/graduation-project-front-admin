@@ -1,6 +1,11 @@
 import { defineStore } from 'pinia'
 import { deleteTradePublish } from '@/api/tradePublish'
-import { exportTradeList, getTradeListDetail, getTradeListPage } from '@/api/tradeList'
+import {
+  exportTradeList,
+  getTradeListDetail,
+  getTradeListPage,
+  receiveTradeList
+} from '@/api/tradeList'
 import {
   applyPageResult,
   createPaginationState,
@@ -11,7 +16,6 @@ import {
 
 function createDefaultSearchForm() {
   return {
-    status: '',
     minAmount: '',
     maxAmount: '',
     dateRange: []
@@ -38,6 +42,7 @@ export const useTradeListStore = defineStore('tradeList', {
       try {
         const pageData = await getTradeListPage({
           ...this.searchForm,
+          status: 'published',
           pageNum: this.pagination.currentPage,
           pageSize: this.pagination.pageSize
         })
@@ -79,6 +84,10 @@ export const useTradeListStore = defineStore('tradeList', {
     },
     async exportData() {
       return exportTradeList(this.searchForm)
+    },
+    async receiveById(id) {
+      await receiveTradeList(id)
+      await this.fetchData()
     },
     async setPageSize(pageSize) {
       updatePageSize(this, pageSize)

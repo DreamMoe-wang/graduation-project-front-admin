@@ -50,6 +50,22 @@ export function updateTradePublish(id, data) {
   })
 }
 
+export function approveTradePublish(id, data = {}) {
+  return request({
+    url: `/trade/publish/${id}/approve`,
+    method: 'post',
+    data
+  })
+}
+
+export function rejectTradePublish(id, data = {}) {
+  return request({
+    url: `/trade/publish/${id}/reject`,
+    method: 'post',
+    data
+  })
+}
+
 export function deleteTradePublish(id) {
   return request({
     url: `/trade/publish/${id}`,
