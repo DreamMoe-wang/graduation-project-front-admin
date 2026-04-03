@@ -227,17 +227,20 @@ export default {
     this.fetchProfile()
   },
   methods: {
+    applyProfile(data) {
+      this.profile = {
+        ...createDefaultProfile(),
+        ...data,
+        gender: typeof data?.gender === 'number' ? data.gender : 0
+      }
+      this.originalProfile = JSON.parse(JSON.stringify(this.profile))
+    },
     async fetchProfile() {
       this.loading = true
 
       try {
         const data = await getCurrentUserProfile()
-        this.profile = {
-          ...createDefaultProfile(),
-          ...data,
-          gender: typeof data?.gender === 'number' ? data.gender : 0
-        }
-        this.originalProfile = JSON.parse(JSON.stringify(this.profile))
+        this.applyProfile(data)
       } catch (error) {
         console.error('获取个人信息失败:', error)
       } finally {
@@ -277,6 +280,24 @@ export default {
         this.uploadingAvatar = false
       }
     },
+    syncAuthUserProfile() {
+      const currentUser = this.authStore.currentUser || {}
+      const nextDisplayName = this.profile.displayName
+        || this.profile.nickname
+        || currentUser.displayName
+        || currentUser.nickname
+        || currentUser.username
+        || ''
+
+      this.authStore.setUser({
+        ...currentUser,
+        nickname: this.profile.nickname,
+        displayName: nextDisplayName,
+        avatar: this.profile.avatar,
+        phone: this.profile.phone,
+        email: this.profile.email
+      })
+    },
     handleSave() {
       this.$refs.formRef?.validate(async valid => {
         if (!valid) return
@@ -284,7 +305,7 @@ export default {
         this.saving = true
 
         try {
-          await updateCurrentUserProfile({
+          const updatedProfile = await updateCurrentUserProfile({
             nickname: this.profile.nickname,
             avatar: this.profile.avatar,
             phone: this.profile.phone,
@@ -297,8 +318,8 @@ export default {
             bio: this.profile.bio
           })
 
-          await this.fetchProfile()
-          await this.authStore.restoreSession()
+          this.applyProfile(updatedProfile)
+          this.syncAuthUserProfile()
           this.$message.success('个人信息已更新')
         } catch (error) {
           console.error('保存个人信息失败:', error)

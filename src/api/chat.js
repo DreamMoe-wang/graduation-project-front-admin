@@ -36,3 +36,10 @@ export function markChatSessionRead(sessionId) {
     method: 'post'
   })
 }
+
+export function deleteChatSession(sessionId) {
+  return request({
+    url: `/chat/sessions/${sessionId}`,
+    method: 'delete'
+  })
+}

@@ -16,6 +16,7 @@ import {
 
 function createDefaultSearchForm() {
   return {
+    title: '',
     minAmount: '',
     maxAmount: '',
     dateRange: []

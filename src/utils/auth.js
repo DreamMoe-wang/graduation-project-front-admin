@@ -3,6 +3,8 @@ const USER_KEY = 'admin-user'
 const MENU_KEY = 'admin-menus'
 const PERMISSION_KEY = 'admin-permissions'
 const DEV_BYPASS_TOKEN = '__DEV_BYPASS_TOKEN__'
+const DEV_BYPASS_PREFIX = `${DEV_BYPASS_TOKEN}:`
+const DEV_BYPASS_TTL_MS = 2 * 60 * 60 * 1000
 
 function safeLocalStorage() {
   if (typeof window === 'undefined') {
@@ -129,11 +131,21 @@ export function setStoredPermissions(permissions) {
 }
 
 export function createDevBypassToken() {
-  return DEV_BYPASS_TOKEN
+  return `${DEV_BYPASS_PREFIX}${Date.now() + DEV_BYPASS_TTL_MS}`
 }
 
 export function isDevBypassToken(token) {
   return token === DEV_BYPASS_TOKEN
+    || (typeof token === 'string' && token.startsWith(DEV_BYPASS_PREFIX))
+}
+
+function getDevBypassExpireAt(token) {
+  if (typeof token !== 'string') return 0
+  if (token === DEV_BYPASS_TOKEN) return 0
+  if (!token.startsWith(DEV_BYPASS_PREFIX)) return 0
+
+  const expireAt = Number(token.slice(DEV_BYPASS_PREFIX.length))
+  return Number.isFinite(expireAt) ? expireAt : 0
 }
 
 function decodeBase64Url(value) {
@@ -158,10 +170,11 @@ export function parseJwtPayload(token) {
   if (!token) return null
 
   if (isDevBypassToken(token)) {
+    const exp = getDevBypassExpireAt(token)
     return {
       userId: 0,
       username: 'admin',
-      exp: Date.now() + 7 * 24 * 60 * 60 * 1000
+      exp
     }
   }
 
@@ -179,7 +192,7 @@ export function parseJwtPayload(token) {
 
 export function isTokenExpired(token) {
   if (typeof token === 'string' && isDevBypassToken(token)) {
-    return false
+    return getDevBypassExpireAt(token) <= Date.now()
   }
 
   const payload = typeof token === 'string' ? parseJwtPayload(token) : token

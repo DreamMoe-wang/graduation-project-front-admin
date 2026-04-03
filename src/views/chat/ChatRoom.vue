@@ -1,8 +1,7 @@
-<template>
+﻿<template>
     <div class="chat-room">
         <el-card class="chat-card">
             <div class="chat-container">
-                <!-- 左侧会话列表 -->
                 <div class="chat-sidebar">
                     <div class="search-box">
                         <el-input
@@ -13,7 +12,8 @@
                             clearable
                         />
                     </div>
-                    <div class="session-list" v-loading="loadingSessions">
+
+                    <div class="session-list" v-loading="loadingSessions" @scroll="closeSessionMenu">
                         <template v-if="sessionList.length">
                             <div
                                 v-for="item in sessionList"
@@ -21,18 +21,28 @@
                                 class="session-item"
                                 :class="{ active: currentSessionId === item.id }"
                                 @click="selectSession(item)"
+                                @contextmenu.prevent="openSessionMenu($event, item)"
                             >
                                 <el-avatar :size="48" :src="item.avatar" class="avatar">
                                     {{ getDisplayInitial(item.name) }}
                                 </el-avatar>
                                 <div class="session-info">
                                     <div class="session-header">
-                                        <span class="session-name">{{ item.name }}</span>
+                                        <div class="session-title-row">
+                                            <span class="session-name">{{ item.name }}</span>
+                                            <el-tag
+                                                v-if="item.tradeTitle || item.tradeId"
+                                                size="small"
+                                                type="info"
+                                                effect="plain"
+                                                class="session-trade-tag"
+                                            >
+                                                {{ item.tradeTitle || `交易#${item.tradeId}` }}
+                                            </el-tag>
+                                        </div>
                                         <span class="session-time">{{ item.time }}</span>
                                     </div>
-                                    <div class="session-last-msg">
-                                        {{ item.lastMessage }}
-                                    </div>
+                                    <div class="session-last-msg">{{ item.lastMessage }}</div>
                                 </div>
                                 <el-badge
                                     v-if="item.unread > 0"
@@ -44,12 +54,25 @@
                         </template>
                         <el-empty v-else description="暂无会话" />
                     </div>
+
+                    <div
+                        v-if="sessionMenuVisible"
+                        class="session-context-menu"
+                        :style="sessionMenuStyle"
+                    >
+                        <button
+                            class="session-context-action"
+                            type="button"
+                            :disabled="deletingSession"
+                            @click.stop="handleDeleteSession"
+                        >
+                            {{ deletingSession ? '删除中...' : '删除会话' }}
+                        </button>
+                    </div>
                 </div>
 
-                <!-- 右侧聊天区域 -->
                 <div class="chat-main">
                     <div v-if="currentSession" class="chat-content">
-                        <!-- 聊天头部 -->
                         <div class="chat-header">
                             <div class="chat-user-info">
                                 <el-avatar :size="40" :src="currentSession.avatar">
@@ -69,7 +92,6 @@
                             </div>
                         </div>
 
-                        <!-- 消息列表 -->
                         <div class="message-list" ref="messageListRef" v-loading="loadingMessages">
                             <template v-if="messageList.length">
                                 <div v-for="msg in messageList" :key="msg.id" class="message-item" :class="msg.type">
@@ -98,7 +120,6 @@
                             <el-empty v-else description="暂无聊天记录" />
                         </div>
 
-                        <!-- 输入区域 -->
                         <div class="input-area">
                             <el-input
                                 v-model="messageInput"
@@ -135,7 +156,7 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useRoute } from 'vue-router'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { FolderOpened, Picture, RefreshRight, Search } from '@element-plus/icons-vue'
 import { getToken } from '@/utils/auth'
 import { useChatStore } from '@/stores/chat'
@@ -169,12 +190,78 @@ export default {
         const sending = computed(() => storeSending.value || wsSending.value)
         const pendingAcks = new Map()
 
+        const sessionMenuVisible = ref(false)
+        const sessionMenuPosition = ref({ x: 0, y: 0 })
+        const sessionMenuTarget = ref(null)
+        const deletingSession = ref(false)
+        const sessionMenuStyle = computed(() => ({
+            left: `${sessionMenuPosition.value.x}px`,
+            top: `${sessionMenuPosition.value.y}px`
+        }))
+
         let searchTimer = null
         let reconnectTimer = null
         let heartbeatTimer = null
         let reconnectAttempts = 0
         let manualClose = false
         let chatSocket = null
+
+        const closeSessionMenu = () => {
+            sessionMenuVisible.value = false
+            sessionMenuTarget.value = null
+        }
+
+        const openSessionMenu = (event, item) => {
+            if (!item) return
+
+            const menuWidth = 148
+            const menuHeight = 44
+            const viewportWidth = window.innerWidth || 0
+            const viewportHeight = window.innerHeight || 0
+
+            sessionMenuPosition.value = {
+                x: Math.min(event.clientX, Math.max(0, viewportWidth - menuWidth - 8)),
+                y: Math.min(event.clientY, Math.max(0, viewportHeight - menuHeight - 8))
+            }
+            sessionMenuTarget.value = item
+            sessionMenuVisible.value = true
+        }
+
+        const handleDeleteSession = async () => {
+            const target = sessionMenuTarget.value
+            if (!target || deletingSession.value) return
+
+            try {
+                await ElMessageBox.confirm(
+                    `确定删除与“${target.name}”的会话吗？`,
+                    '提示',
+                    {
+                        confirmButtonText: '确定',
+                        cancelButtonText: '取消',
+                        type: 'warning'
+                    }
+                )
+
+                deletingSession.value = true
+                await store.deleteSession(target.id)
+                ElMessage.success('会话已删除')
+            } catch (error) {
+                if (error !== 'cancel' && error !== 'close') {
+                    console.error('Delete chat session failed:', error)
+                }
+            } finally {
+                deletingSession.value = false
+                closeSessionMenu()
+            }
+        }
+
+        const handleGlobalClick = event => {
+            if (!sessionMenuVisible.value) return
+            const contextMenu = event.target?.closest?.('.session-context-menu')
+            if (!contextMenu) {
+                closeSessionMenu()
+            }
+        }
 
         const scrollToBottom = () => {
             const container = messageListRef.value
@@ -387,6 +474,7 @@ export default {
         }
 
         const selectSession = async session => {
+            closeSessionMenu()
             try {
                 await store.selectSession(session)
             } catch (error) {
@@ -460,6 +548,8 @@ export default {
         onMounted(() => {
             manualClose = false
             connectWebSocket()
+            window.addEventListener('click', handleGlobalClick)
+            window.addEventListener('resize', closeSessionMenu)
 
             const tradeId = route.query.tradeId
             if (tradeId) {
@@ -490,6 +580,8 @@ export default {
                 clearTimeout(searchTimer)
                 searchTimer = null
             }
+            window.removeEventListener('click', handleGlobalClick)
+            window.removeEventListener('resize', closeSessionMenu)
             disconnectWebSocket()
         })
 
@@ -505,6 +597,12 @@ export default {
             sending,
             wsConnected,
             currentSession,
+            sessionMenuVisible,
+            sessionMenuStyle,
+            deletingSession,
+            closeSessionMenu,
+            openSessionMenu,
+            handleDeleteSession,
             selectSession,
             sendMessage,
             refreshCurrentSession,
@@ -534,6 +632,7 @@ export default {
     border-right: 1px solid #eee;
     display: flex;
     flex-direction: column;
+    position: relative;
 }
 
 .search-box {
@@ -577,16 +676,32 @@ export default {
     display: flex;
     justify-content: space-between;
     margin-bottom: 4px;
+    gap: 8px;
+}
+
+.session-title-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
 }
 
 .session-name {
     font-weight: 500;
     color: #333;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.session-trade-tag {
+    flex-shrink: 0;
 }
 
 .session-time {
     font-size: 12px;
     color: #999;
+    flex-shrink: 0;
 }
 
 .session-last-msg {
@@ -601,6 +716,37 @@ export default {
     position: absolute;
     top: 16px;
     right: 16px;
+}
+
+.session-context-menu {
+    position: fixed;
+    z-index: 3000;
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    padding: 6px;
+    box-shadow: 0 10px 28px rgba(15, 23, 42, 0.18);
+}
+
+.session-context-action {
+    min-width: 132px;
+    padding: 8px 12px;
+    border: none;
+    border-radius: 6px;
+    background: transparent;
+    cursor: pointer;
+    text-align: left;
+    color: #ef4444;
+    font-size: 13px;
+}
+
+.session-context-action:hover {
+    background: #fef2f2;
+}
+
+.session-context-action:disabled {
+    color: #9ca3af;
+    cursor: not-allowed;
 }
 
 .chat-main {

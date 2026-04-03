@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import {
+  deleteChatSession,
   getChatMessages,
   getChatSessions,
   markChatSessionRead,
@@ -140,6 +141,19 @@ export const useChatStore = defineStore('chat', {
         this.fetchMessages(this.currentSessionId),
         this.fetchSessions(true, { silent: true })
       ])
+    },
+    async deleteSession(sessionId) {
+      if (!sessionId) return false
+
+      await deleteChatSession(sessionId)
+
+      if (Number(this.currentSessionId) === Number(sessionId)) {
+        this.currentSessionId = null
+        this.messageList = []
+      }
+
+      await this.fetchSessions(true, { silent: true })
+      return true
     }
   }
 })

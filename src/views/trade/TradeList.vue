@@ -3,6 +3,11 @@
         <!-- 搜索筛选区域 -->
         <el-card class="search-card">
             <el-form :inline="true" :model="searchForm" class="search-form" label-width="80px">
+
+                <el-form-item label="交易标题">
+                    <el-input v-model="searchForm.title" placeholder="请输入交易标题" clearable style="width: 180px" />
+                </el-form-item>
+
                 <el-form-item label="金额范围">
                     <div class="amount-range">
                         <el-input v-model="searchForm.minAmount" placeholder="最低" type="number" style="width: 100px" />
@@ -41,7 +46,8 @@
                     <span class="page-title">交易大全</span>
                 </div>
                 <div class="header-right">
-                    <el-button v-permission="['trade:list:export', 'trade:review']" type="success" @click="handleExport">
+                    <el-button v-permission="['trade:list:export', 'trade:review']" type="success"
+                        @click="handleExport">
                         <el-icon>
                             <Download />
                         </el-icon>
@@ -91,28 +97,21 @@
                                 <el-button type="primary" size="small" @click="handleViewDetail(item)">
                                     详情
                                 </el-button>
-                                <el-button
-                                    v-permission="['chat:contact', 'chat:view']"
-                                    type="success"
-                                    size="small"
-                                    plain
-                                    @click="handleContact(item)"
-                                >
+                                <el-button v-permission="['chat:contact', 'chat:view']" type="success" size="small"
+                                    plain @click="handleContact(item)">
                                     私聊
                                 </el-button>
-                                <el-button
-                                    v-if="item.status === 'published'"
-                                    v-permission="['trade:list:take', 'trade:order:receive']"
-                                    type="primary"
-                                    size="small"
-                                    @click="handleReceive(item)"
-                                >
+                                <el-button v-if="item.status === 'published'"
+                                    v-permission="['trade:list:take', 'trade:order:receive']" type="primary"
+                                    size="small" @click="handleReceive(item)">
                                     接取
                                 </el-button>
-                                <el-button v-permission="['trade:list:edit', 'trade:review']" type="warning" size="small" @click="handleEdit(item)">
+                                <el-button v-permission="['trade:list:edit', 'trade:review']" type="warning"
+                                    size="small" @click="handleEdit(item)">
                                     编辑
                                 </el-button>
-                                <el-button v-permission="['trade:list:delete', 'trade:review']" type="danger" size="small" @click="handleDelete(item)">
+                                <el-button v-permission="['trade:list:delete', 'trade:review']" type="danger"
+                                    size="small" @click="handleDelete(item)">
                                     删除
                                 </el-button>
                             </div>
