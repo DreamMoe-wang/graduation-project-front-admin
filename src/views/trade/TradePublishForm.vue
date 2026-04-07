@@ -36,6 +36,24 @@
           <el-input v-model="formData.clientPhone" disabled />
         </el-form-item>
 
+        <el-form-item label="位置" prop="location">
+          <div class="location-row">
+            <el-input
+              v-model="formData.location"
+              placeholder="请输入位置，或点击右侧按钮自动定位"
+              @input="handleLocationInput"
+            />
+            <el-button
+              type="primary"
+              plain
+              :loading="locating"
+              @click="handleLocate"
+            >
+              {{ locating ? '定位中...' : '百度定位' }}
+            </el-button>
+          </div>
+        </el-form-item>
+
         <el-form-item label="交易金额" prop="amount">
           <el-input-number
             v-model="formData.amount"
@@ -84,6 +102,7 @@ import { onMounted, onUnmounted, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
+import { locateByIp, reverseGeocodeLocation } from '@/api/location'
 import { useAuthStore } from '@/stores/auth'
 import { useTradePublishEditorStore } from '@/stores/tradePublishEditor'
 import { emitCloseTag } from '@/utils/tags'
@@ -99,6 +118,9 @@ const formRules = {
   ],
   amount: [
     { required: true, message: '请输入交易金额', trigger: 'blur' }
+  ],
+  location: [
+    { max: 255, message: '位置长度不能超过 255 个字符', trigger: 'blur' }
   ]
 }
 
@@ -111,6 +133,7 @@ export default {
     const router = useRouter()
     const formRef = ref(null)
     const pendingAction = ref('')
+    const locating = ref(false)
     const { loading, submitLoading, isEdit, formData } = storeToRefs(store)
 
     const loadPage = async () => {
@@ -165,6 +188,76 @@ export default {
       submitByStatus('auditing')
     }
 
+    const getBrowserPosition = () => {
+      if (typeof navigator === 'undefined' || !navigator.geolocation) {
+        return Promise.reject(new Error('当前浏览器不支持定位'))
+      }
+
+      return new Promise((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(
+          position => {
+            resolve({
+              latitude: position.coords.latitude,
+              longitude: position.coords.longitude
+            })
+          },
+          error => {
+            const errorMap = {
+              1: '未授予定位权限，请允许浏览器定位',
+              2: '定位结果不可用，请稍后重试',
+              3: '定位超时，请检查网络后重试'
+            }
+            reject(new Error(errorMap[error?.code] || '浏览器定位失败，请稍后重试'))
+          },
+          {
+            enableHighAccuracy: true,
+            timeout: 10000,
+            maximumAge: 0
+          }
+        )
+      })
+    }
+
+    const applyLocationResult = (location, byIp = false) => {
+      formData.value.cityName = location?.cityName || formData.value.cityName || ''
+      formData.value.areaName = location?.areaName || formData.value.areaName || ''
+      formData.value.location = location?.address || formData.value.location || ''
+
+      const locationLabel = formData.value.location
+        || [location?.cityName, location?.areaName].filter(Boolean).join(' ')
+        || '当前位置'
+
+      ElMessage.success(byIp ? `已根据 IP 定位：${locationLabel}` : `定位成功：${locationLabel}`)
+    }
+
+    const handleLocate = async () => {
+      locating.value = true
+
+      try {
+        const position = await getBrowserPosition()
+        const location = await reverseGeocodeLocation({
+          latitude: position.latitude,
+          longitude: position.longitude
+        }, { silent: true })
+        applyLocationResult(location)
+      } catch (error) {
+        try {
+          const fallbackLocation = await locateByIp({ silent: true })
+          applyLocationResult(fallbackLocation, true)
+        } catch (fallbackError) {
+          ElMessage.error(error?.message || fallbackError?.message || '定位失败，请稍后重试')
+          console.error('Trade locate failed:', error, fallbackError)
+        }
+      } finally {
+        locating.value = false
+      }
+    }
+
+    const handleLocationInput = () => {
+      formData.value.cityName = ''
+      formData.value.areaName = ''
+    }
+
     onMounted(async () => {
       await loadPage()
     })
@@ -188,9 +281,12 @@ export default {
       isEdit,
       formData,
       pendingAction,
+      locating,
       handleCancel,
       handleSaveDraft,
-      handleSubmitAudit
+      handleSubmitAudit,
+      handleLocate,
+      handleLocationInput
     }
   }
 }
@@ -249,6 +345,17 @@ export default {
   max-width: 760px;
 }
 
+.location-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+}
+
+.location-row .el-input {
+  flex: 1;
+}
+
 .action-bar {
   display: flex;
   justify-content: flex-end;
@@ -263,6 +370,11 @@ export default {
 
   .trade-form {
     max-width: 100%;
+  }
+
+  .location-row {
+    flex-direction: column;
+    align-items: stretch;
   }
 }
 </style>

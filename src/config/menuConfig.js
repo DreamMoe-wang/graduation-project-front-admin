@@ -40,19 +40,9 @@ export default [
     icon: 'User'
   },
   {
-    path: '/role',
-    name: '角色管理',
-    icon: 'Avatar'
-  },
-  {
     path: '/menu',
     name: '菜单管理',
     icon: 'Menu'
-  },
-  {
-    path: '/dict',
-    name: '字典管理',
-    icon: 'Collection'
   },
   {
     path: '/notice',

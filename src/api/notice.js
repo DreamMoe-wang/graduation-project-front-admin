@@ -12,8 +12,9 @@ function normalizePageQuery(params = {}) {
   return normalized
 }
 
-export function getNoticePage(params) {
+export function getNoticePage(params, config = {}) {
   return request({
+    ...config,
     url: '/notice/page',
     method: 'get',
     params: normalizePageQuery(params)
@@ -23,6 +24,23 @@ export function getNoticePage(params) {
 export function getNoticeDetail(id) {
   return request({
     url: `/notice/${id}`,
+    method: 'get'
+  })
+}
+
+export function getPublicNoticePage(params, config = {}) {
+  return request({
+    ...config,
+    url: '/notice/public/page',
+    method: 'get',
+    params: normalizePageQuery(params)
+  })
+}
+
+export function getPublicNoticeDetail(id, config = {}) {
+  return request({
+    ...config,
+    url: `/notice/public/${id}`,
     method: 'get'
   })
 }

@@ -300,6 +300,19 @@ export default {
     position: relative;
     min-height: 100vh;
     overflow: hidden;
+    --el-bg-color: #ffffff;
+    --el-bg-color-overlay: #ffffff;
+    --el-card-bg-color: rgba(255, 255, 255, 0.9);
+    --el-fill-color-blank: rgba(255, 255, 255, 0.96);
+    --el-fill-color-light: rgba(255, 255, 255, 0.96);
+    --el-fill-color-lighter: rgba(255, 255, 255, 0.96);
+    --el-fill-color-extra-light: rgba(255, 255, 255, 0.96);
+    --el-border-color-light: rgba(15, 23, 42, 0.08);
+    --el-border-color: rgba(15, 23, 42, 0.12);
+    --el-text-color-primary: #111827;
+    --el-text-color-regular: #374151;
+    --el-text-color-secondary: #6b7280;
+    --el-text-color-placeholder: #94a3b8;
     background: linear-gradient(180deg, #f9fcfc 0%, #f2f8f8 100%);
     display: flex;
     align-items: center;
@@ -427,7 +440,17 @@ export default {
 .auth-form :deep(.el-input__wrapper) {
     min-height: 52px;
     border-radius: 18px;
+    background: rgba(255, 255, 255, 0.96);
     box-shadow: 0 0 0 1px rgba(15, 23, 42, 0.08) inset;
+}
+
+.auth-form :deep(.el-input__inner) {
+    color: #111827;
+}
+
+.auth-form :deep(.el-input__prefix),
+.auth-form :deep(.el-input__suffix) {
+    color: #6b7280;
 }
 
 .auth-form :deep(.el-input__wrapper.is-focus) {

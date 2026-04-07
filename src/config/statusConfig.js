@@ -22,8 +22,9 @@ export const TRADE_STATUS_TEXT_MAP = TRADE_STATUS_OPTIONS.reduce((acc, item) => 
 }, {})
 
 export const ORDER_STATUS_OPTIONS = [
-  { label: '待接单', value: 'pending' },
+  { label: '待确认', value: 'pending' },
   { label: '进行中', value: 'progress' },
+  { label: '待支付', value: 'pay_pending' },
   { label: '已完成', value: 'success' },
   { label: '已取消', value: 'cancel' }
 ]
@@ -31,6 +32,7 @@ export const ORDER_STATUS_OPTIONS = [
 export const ORDER_STATUS_TYPE_MAP = {
   pending: 'warning',
   progress: 'primary',
+  pay_pending: 'danger',
   success: 'success',
   cancel: 'info'
 }

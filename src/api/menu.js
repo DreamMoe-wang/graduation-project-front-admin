@@ -20,6 +20,14 @@ export function getMenuPage(params) {
   })
 }
 
+export function getMenuTree(config = {}) {
+  return request({
+    ...config,
+    url: '/menu/tree',
+    method: 'get'
+  })
+}
+
 export function getMenuDetail(id) {
   return request({
     url: `/menu/${id}`,

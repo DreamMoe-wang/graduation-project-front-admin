@@ -22,6 +22,10 @@
               <span class="meta-label">手机号</span>
               <span class="meta-value">{{ profile.phone || '-' }}</span>
             </div>
+            <div class="meta-item">
+              <span class="meta-label">钱包余额</span>
+              <span class="meta-value">{{ walletBalanceText }}</span>
+            </div>
           </div>
         </el-card>
       </el-col>
@@ -67,6 +71,7 @@
                   <el-input v-model="profile.email" placeholder="请输入邮箱" />
                 </el-form-item>
               </el-col>
+
               <el-col :xs="24" :md="12">
                 <el-form-item label="手机号" prop="phone">
                   <el-input v-model="profile.phone" placeholder="请输入手机号" />
@@ -84,6 +89,7 @@
                   />
                 </el-form-item>
               </el-col>
+
               <el-col :xs="24" :md="12">
                 <el-form-item label="头像上传" prop="avatar">
                   <div class="avatar-uploader">
@@ -116,9 +122,24 @@
                   <el-input v-model="profile.cityName" placeholder="请输入城市" />
                 </el-form-item>
               </el-col>
+
               <el-col :xs="24" :md="12">
-                <el-form-item label="区域" prop="areaName">
-                  <el-input v-model="profile.areaName" placeholder="请输入区域" />
+                <el-form-item label="定位区域" prop="areaName">
+                  <div class="location-row">
+                    <el-input
+                      :model-value="locationText"
+                      placeholder="点击右侧按钮使用百度定位"
+                      readonly
+                    />
+                    <el-button
+                      type="primary"
+                      plain
+                      :loading="locating"
+                      @click="handleLocate"
+                    >
+                      {{ locating ? '定位中...' : '百度定位' }}
+                    </el-button>
+                  </div>
                 </el-form-item>
               </el-col>
 
@@ -155,9 +176,11 @@
 
 <script>
 import { Plus } from '@element-plus/icons-vue'
+import { locateByIp, reverseGeocodeLocation } from '@/api/location'
 import { uploadOssFile } from '@/api/oss'
 import { getCurrentUserProfile, updateCurrentUserProfile } from '@/api/user'
 import { useAuthStore } from '@/stores/auth'
+import { formatCurrency } from '@/utils/format'
 
 function createDefaultProfile() {
   return {
@@ -173,6 +196,7 @@ function createDefaultProfile() {
     areaName: '',
     address: '',
     bio: '',
+    walletBalance: 0,
     roleNames: []
   }
 }
@@ -187,6 +211,7 @@ export default {
       loading: false,
       saving: false,
       uploadingAvatar: false,
+      locating: false,
       profile: createDefaultProfile(),
       originalProfile: createDefaultProfile(),
       rules: {
@@ -221,6 +246,16 @@ export default {
     displayInitial() {
       const text = this.profile.displayName || this.profile.nickname || this.profile.username || '我'
       return text.charAt(0)
+    },
+    walletBalanceText() {
+      return formatCurrency(this.profile.walletBalance || 0)
+    },
+    locationText() {
+      const summary = [this.profile.cityName, this.profile.areaName].filter(Boolean).join(' ')
+      if (!summary && !this.profile.address) {
+        return ''
+      }
+      return [summary, this.profile.address].filter(Boolean).join(' · ')
     }
   },
   mounted() {
@@ -279,6 +314,65 @@ export default {
       } finally {
         this.uploadingAvatar = false
       }
+    },
+    async handleLocate() {
+      this.locating = true
+
+      try {
+        const position = await this.getBrowserPosition()
+        const location = await reverseGeocodeLocation({
+          latitude: position.latitude,
+          longitude: position.longitude
+        }, { silent: true })
+        this.applyLocationResult(location)
+      } catch (error) {
+        try {
+          const fallbackLocation = await locateByIp({ silent: true })
+          this.applyLocationResult(fallbackLocation, true)
+        } catch (fallbackError) {
+          this.$message.error(error?.message || fallbackError?.message || '定位失败，请稍后重试')
+          console.error('Locate failed:', error, fallbackError)
+        }
+      } finally {
+        this.locating = false
+      }
+    },
+    getBrowserPosition() {
+      if (typeof navigator === 'undefined' || !navigator.geolocation) {
+        return Promise.reject(new Error('当前浏览器不支持定位'))
+      }
+
+      return new Promise((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(
+          position => {
+            resolve({
+              latitude: position.coords.latitude,
+              longitude: position.coords.longitude
+            })
+          },
+          error => {
+            const errorMap = {
+              1: '未授予定位权限，请允许浏览器定位',
+              2: '定位结果不可用，请稍后重试',
+              3: '定位超时，请检查网络后重试'
+            }
+            reject(new Error(errorMap[error?.code] || '浏览器定位失败，请稍后重试'))
+          },
+          {
+            enableHighAccuracy: true,
+            timeout: 10000,
+            maximumAge: 0
+          }
+        )
+      })
+    },
+    applyLocationResult(location, byIp = false) {
+      this.profile.cityName = location?.cityName || this.profile.cityName
+      this.profile.areaName = location?.areaName || this.profile.areaName
+      this.profile.address = location?.address || this.profile.address
+
+      const locationLabel = [location?.cityName, location?.areaName].filter(Boolean).join(' ') || '当前位置'
+      this.$message.success(byIp ? `已根据 IP 定位：${locationLabel}` : `定位成功：${locationLabel}`)
     },
     syncAuthUserProfile() {
       const currentUser = this.authStore.currentUser || {}
@@ -339,6 +433,8 @@ export default {
 
 .profile-card {
   border-radius: 16px;
+  background: var(--app-surface);
+  box-shadow: var(--app-card-shadow);
 }
 
 .profile-summary {
@@ -354,12 +450,12 @@ export default {
 
 .summary-info h2 {
   font-size: 24px;
-  color: #1f2937;
+  color: var(--app-text);
   margin-bottom: 6px;
 }
 
 .summary-info p {
-  color: #6b7280;
+  color: var(--app-text-secondary);
 }
 
 .summary-meta {
@@ -372,15 +468,15 @@ export default {
   justify-content: space-between;
   gap: 16px;
   padding-bottom: 10px;
-  border-bottom: 1px solid #eef2f7;
+  border-bottom: 1px solid var(--app-border);
 }
 
 .meta-label {
-  color: #6b7280;
+  color: var(--app-text-secondary);
 }
 
 .meta-value {
-  color: #111827;
+  color: var(--app-text);
   font-weight: 500;
   text-align: right;
 }
@@ -391,12 +487,12 @@ export default {
 
 .card-header h3 {
   font-size: 22px;
-  color: #1f2937;
+  color: var(--app-text);
   margin-bottom: 8px;
 }
 
 .card-header p {
-  color: #6b7280;
+  color: var(--app-text-secondary);
 }
 
 .action-bar {
@@ -416,8 +512,8 @@ export default {
   width: 110px;
   height: 110px;
   border-radius: 18px;
-  border: 1px dashed #cbd5e1;
-  background: linear-gradient(135deg, #f8fafc, #eef6f6);
+  border: 1px dashed var(--app-border);
+  background: linear-gradient(135deg, var(--app-surface-soft), var(--app-surface));
   display: flex;
   align-items: center;
   justify-content: center;
@@ -427,8 +523,8 @@ export default {
 }
 
 .upload-panel:hover {
-  border-color: #14b8a6;
-  box-shadow: 0 0 0 4px rgba(20, 184, 166, 0.08);
+  border-color: var(--app-theme-color);
+  box-shadow: 0 0 0 4px rgba(var(--app-theme-color-rgb), 0.12);
 }
 
 .upload-preview {
@@ -439,12 +535,35 @@ export default {
 
 .upload-icon {
   font-size: 28px;
-  color: #94a3b8;
+  color: var(--app-text-secondary);
 }
 
 .upload-meta {
-  color: #6b7280;
+  color: var(--app-text-secondary);
   font-size: 13px;
   line-height: 1.7;
+}
+
+.location-row {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.location-row .el-input {
+  flex: 1;
+}
+
+@media (max-width: 768px) {
+  .location-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .avatar-uploader {
+    flex-direction: column;
+    align-items: flex-start;
+  }
 }
 </style>

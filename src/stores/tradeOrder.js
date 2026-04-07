@@ -5,6 +5,7 @@ import {
   getTradeOrderDetail,
   getTradeOrderPage,
   getTradeOrderStats,
+  payTradeOrder,
   receiveTradeOrder
 } from '@/api/tradeOrder'
 import {
@@ -84,6 +85,9 @@ export const useTradeOrderStore = defineStore('tradeOrder', {
     },
     async complete(id) {
       await this.performOrderAction(id, 'complete', completeTradeOrder)
+    },
+    async pay(id) {
+      await this.performOrderAction(id, 'pay', payTradeOrder)
     },
     async cancel(id) {
       await this.performOrderAction(id, 'cancel', cancelTradeOrder)

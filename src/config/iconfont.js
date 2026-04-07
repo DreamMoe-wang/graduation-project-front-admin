@@ -27,7 +27,6 @@ export const iconMap = {
   user: 'User',
   role: 'Avatar',
   menu: 'Menu',
-  dict: 'Collection',
   notice: 'Bell',
   log: 'Notebook',
   setting: 'Setting'

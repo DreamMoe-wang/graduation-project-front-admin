@@ -2,15 +2,13 @@ import axios from 'axios'
 import { ElMessage } from 'element-plus'
 import { clearAuthStorage, getToken } from '@/utils/auth'
 
-const defaultBaseURL = process.env.VUE_APP_BASE_API
-  || (process.env.NODE_ENV === 'development' ? 'http://localhost:9090/api' : '/api')
+const defaultBaseURL = process.env.VUE_APP_BASE_API || '/api'
 
 const request = axios.create({
   baseURL: defaultBaseURL,
   timeout: 5000
 })
 
-// 请求拦截器
 request.interceptors.request.use(
   config => {
     const token = getToken()
@@ -27,7 +25,6 @@ request.interceptors.request.use(
   error => Promise.reject(error)
 )
 
-// 响应拦截器
 request.interceptors.response.use(
   response => {
     const payload = response.data
@@ -37,7 +34,10 @@ request.interceptors.response.use(
         return payload.data
       }
 
-      ElMessage.error(payload.message || '请求失败')
+      if (!response.config?.silent) {
+        ElMessage.error(payload.message || '请求失败')
+      }
+
       return Promise.reject(new Error(payload.message || '请求失败'))
     }
 
@@ -54,7 +54,11 @@ request.interceptors.response.use(
     }
 
     const message = error.response?.data?.message || error.message || '网络异常，请稍后重试'
-    ElMessage.error(message)
+
+    if (!error.config?.silent) {
+      ElMessage.error(message)
+    }
+
     return Promise.reject(error)
   }
 )

@@ -112,8 +112,8 @@
                                         </div>
                                         <div class="message-time">{{ msg.time }}</div>
                                     </div>
-                                    <el-avatar v-if="msg.type === 'sent'" :size="36" class="message-avatar">
-                                        我
+                                    <el-avatar v-if="msg.type === 'sent'" :size="36" :src="myAvatar" class="message-avatar">
+                                        {{ getDisplayInitial(myDisplayName) }}
                                     </el-avatar>
                                 </div>
                             </template>
@@ -121,27 +121,57 @@
                         </div>
 
                         <div class="input-area">
-                            <el-input
-                                v-model="messageInput"
-                                type="textarea"
-                                :rows="3"
-                                placeholder="输入消息..."
-                                @keydown.enter.exact.prevent="sendMessage"
-                            />
-                            <div class="input-actions">
-                                <div class="left-actions">
-                                    <el-button text @click="showPlaceholderMessage('图片')">
-                                        <el-icon>
-                                            <Picture />
-                                        </el-icon>
-                                    </el-button>
-                                    <el-button text @click="showPlaceholderMessage('文件')">
-                                        <el-icon>
-                                            <FolderOpened />
-                                        </el-icon>
-                                    </el-button>
+                            <div class="composer-panel" :class="{ resizing: resizingEditor }" :style="{ '--editor-height': `${editorHeight}px` }">
+                                <el-input
+                                    v-model="messageInput"
+                                    type="textarea"
+                                    :rows="4"
+                                    resize="none"
+                                    placeholder="输入消息..."
+                                    class="composer-editor"
+                                    @keydown.enter.exact.prevent="sendMessage"
+                                />
+                                <div class="composer-resizer" @mousedown.prevent="startResizeEditor">
+                                    <span class="resizer-grip" />
                                 </div>
-                                <el-button type="primary" :loading="sending" @click="sendMessage">发送</el-button>
+
+                                <div class="composer-footer">
+                                    <div class="toolbar-left">
+                                        <el-button text class="tool-btn" @click="showPlaceholderMessage('表情')">
+                                            <el-icon><Sunny /></el-icon>
+                                        </el-button>
+                                        <el-button text class="tool-btn" @click="showPlaceholderMessage('图片')">
+                                            <el-icon><Picture /></el-icon>
+                                        </el-button>
+                                        <el-button text class="tool-btn" @click="showPlaceholderMessage('文件')">
+                                            <el-icon><FolderOpened /></el-icon>
+                                        </el-button>
+                                    </div>
+
+                                    <div class="input-actions">
+                                        <el-button class="close-btn" @click="messageInput = ''">关闭</el-button>
+                                        <div class="send-wrap">
+                                            <el-button type="primary" :loading="sending" :disabled="!canSend" @click="sendMessage">
+                                                发送
+                                            </el-button>
+                                            <el-dropdown trigger="click">
+                                                <el-button type="primary" class="send-more">
+                                                    <el-icon><ArrowDown /></el-icon>
+                                                </el-button>
+                                                <template #dropdown>
+                                                    <el-dropdown-menu>
+                                                        <el-dropdown-item @click="showPlaceholderMessage('按 Enter 发送')">
+                                                            按 Enter 发送
+                                                        </el-dropdown-item>
+                                                        <el-dropdown-item @click="showPlaceholderMessage('按 Ctrl+Enter 发送')">
+                                                            按 Ctrl+Enter 发送
+                                                        </el-dropdown-item>
+                                                    </el-dropdown-menu>
+                                                </template>
+                                            </el-dropdown>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -157,9 +187,17 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { FolderOpened, Picture, RefreshRight, Search } from '@element-plus/icons-vue'
+import {
+    ArrowDown,
+    FolderOpened,
+    Picture,
+    RefreshRight,
+    Search,
+    Sunny
+} from '@element-plus/icons-vue'
 import { getToken } from '@/utils/auth'
 import { useChatStore } from '@/stores/chat'
+import { useAuthStore } from '@/stores/auth'
 
 export default {
     name: 'ChatRoom',
@@ -167,10 +205,13 @@ export default {
         Search,
         RefreshRight,
         Picture,
-        FolderOpened
+        FolderOpened,
+        Sunny,
+        ArrowDown
     },
     setup() {
         const store = useChatStore()
+        const authStore = useAuthStore()
         const route = useRoute()
         const messageListRef = ref(null)
         const {
@@ -184,10 +225,22 @@ export default {
             sending: storeSending,
             currentSession
         } = storeToRefs(store)
+        const { currentUser, displayName } = storeToRefs(authStore)
 
         const wsSending = ref(false)
         const wsConnected = ref(false)
         const sending = computed(() => storeSending.value || wsSending.value)
+        const canSend = computed(() => Boolean((messageInput.value || '').trim() && currentSessionId.value))
+        const myAvatar = computed(() => currentUser.value?.avatar || '')
+        const myDisplayName = computed(
+            () => displayName.value || currentUser.value?.nickname || currentUser.value?.username || '我'
+        )
+        const editorHeight = ref(84)
+        const resizingEditor = ref(false)
+        const resizeStartY = ref(0)
+        const resizeStartHeight = ref(84)
+        const minEditorHeight = 64
+        const maxEditorHeight = 220
         const pendingAcks = new Map()
 
         const sessionMenuVisible = ref(false)
@@ -531,6 +584,30 @@ export default {
             ElMessage.info(`${type}消息功能暂未接入后端接口`)
         }
 
+        const onResizeEditorMove = event => {
+            if (!resizingEditor.value) return
+
+            const delta = event.clientY - resizeStartY.value
+            const nextHeight = resizeStartHeight.value + delta
+            editorHeight.value = Math.min(maxEditorHeight, Math.max(minEditorHeight, nextHeight))
+        }
+
+        const stopResizeEditor = () => {
+            if (!resizingEditor.value) return
+
+            resizingEditor.value = false
+            window.removeEventListener('mousemove', onResizeEditorMove)
+            window.removeEventListener('mouseup', stopResizeEditor)
+        }
+
+        const startResizeEditor = event => {
+            resizingEditor.value = true
+            resizeStartY.value = event.clientY
+            resizeStartHeight.value = editorHeight.value
+            window.addEventListener('mousemove', onResizeEditorMove)
+            window.addEventListener('mouseup', stopResizeEditor)
+        }
+
         watch(searchKeyword, () => {
             scheduleSessionSearch()
         })
@@ -545,26 +622,59 @@ export default {
             { deep: true }
         )
 
+        const openSessionFromRoute = async () => {
+            const orderId = route.query.orderId
+            if (orderId) {
+                try {
+                    await store.openOrderSessionByOrderId(orderId)
+                    return true
+                } catch (error) {
+                    console.error('Open order chat session failed:', error)
+                    return false
+                }
+            }
+
+            const tradeId = route.query.tradeId
+            if (tradeId) {
+                try {
+                    await store.openTradeSessionByTradeId(tradeId)
+                    return true
+                } catch (error) {
+                    console.error('Open trade chat session failed:', error)
+                    return false
+                }
+            }
+
+            return false
+        }
+
         onMounted(() => {
             manualClose = false
             connectWebSocket()
             window.addEventListener('click', handleGlobalClick)
             window.addEventListener('resize', closeSessionMenu)
 
-            const tradeId = route.query.tradeId
-            if (tradeId) {
-                store.openTradeSessionByTradeId(tradeId).catch(error => {
-                    console.error('Open trade chat session failed:', error)
-                })
-                return
-            }
-
-            fetchSessions(false)
+            openSessionFromRoute().then(opened => {
+                if (!opened) {
+                    fetchSessions(false)
+                }
+            })
         })
 
         watch(
-            () => route.query.tradeId,
-            async tradeId => {
+            () => [route.query.orderId, route.query.tradeId],
+            async ([orderId, tradeId], [prevOrderId, prevTradeId]) => {
+                if (orderId === prevOrderId && tradeId === prevTradeId) return
+
+                if (orderId) {
+                    try {
+                        await store.openOrderSessionByOrderId(orderId)
+                    } catch (error) {
+                        console.error('Open order chat session failed:', error)
+                    }
+                    return
+                }
+
                 if (!tradeId) return
 
                 try {
@@ -580,6 +690,7 @@ export default {
                 clearTimeout(searchTimer)
                 searchTimer = null
             }
+            stopResizeEditor()
             window.removeEventListener('click', handleGlobalClick)
             window.removeEventListener('resize', closeSessionMenu)
             disconnectWebSocket()
@@ -595,8 +706,13 @@ export default {
             loadingSessions,
             loadingMessages,
             sending,
+            canSend,
             wsConnected,
             currentSession,
+            myAvatar,
+            myDisplayName,
+            editorHeight,
+            resizingEditor,
             sessionMenuVisible,
             sessionMenuStyle,
             deletingSession,
@@ -607,7 +723,8 @@ export default {
             sendMessage,
             refreshCurrentSession,
             getDisplayInitial,
-            showPlaceholderMessage
+            showPlaceholderMessage,
+            startResizeEditor
         }
     }
 }
@@ -615,51 +732,75 @@ export default {
 
 <style scoped>
 .chat-room {
-    padding: 20px;
+    height: 100%;
+    padding: 0;
+    margin: -8px -10px 0 -10px;
 }
 
 .chat-card {
-    height: calc(100vh - 220px);
+    height: calc(100vh - 168px);
+    border: none;
+    border-radius: 18px;
+    overflow: hidden;
+    background: var(--app-surface);
+    box-shadow: var(--app-card-shadow);
+}
+
+.chat-card :deep(.el-card__body) {
+    padding: 0;
+    height: 100%;
 }
 
 .chat-container {
     display: flex;
     height: 100%;
+    background: linear-gradient(180deg, var(--app-surface-soft) 0%, var(--app-surface) 100%);
 }
 
 .chat-sidebar {
-    width: 320px;
-    border-right: 1px solid #eee;
+    width: 336px;
+    border-right: 1px solid var(--app-border);
     display: flex;
     flex-direction: column;
     position: relative;
+    background: linear-gradient(180deg, rgba(var(--app-theme-color-rgb), 0.06) 0%, var(--app-surface) 100%);
 }
 
 .search-box {
-    padding: 16px;
-    border-bottom: 1px solid #eee;
+    padding: 16px 16px 14px;
+    border-bottom: 1px solid var(--app-border);
 }
 
 .session-list {
     flex: 1;
     overflow-y: auto;
+    padding: 8px 0;
+}
+
+.session-list :deep(.el-empty__description p),
+.chat-main :deep(.el-empty__description p) {
+    color: var(--app-text-secondary);
 }
 
 .session-item {
     display: flex;
     align-items: flex-start;
-    padding: 16px;
+    padding: 14px 16px;
+    margin: 0 8px 6px;
+    border-radius: 12px;
     cursor: pointer;
-    transition: background 0.3s;
+    transition: background 0.24s ease, box-shadow 0.24s ease, transform 0.24s ease;
     position: relative;
 }
 
 .session-item:hover {
-    background: #f5f5f5;
+    background: rgba(var(--app-theme-color-rgb), 0.08);
+    transform: translateY(-1px);
 }
 
 .session-item.active {
-    background: #e6f7ff;
+    background: linear-gradient(135deg, rgba(var(--app-theme-color-rgb), 0.18) 0%, rgba(var(--app-theme-color-rgb), 0.1) 100%);
+    box-shadow: 0 8px 16px rgba(var(--app-theme-color-rgb), 0.18);
 }
 
 .avatar {
@@ -687,8 +828,8 @@ export default {
 }
 
 .session-name {
-    font-weight: 500;
-    color: #333;
+    font-weight: 600;
+    color: var(--app-text);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -700,13 +841,13 @@ export default {
 
 .session-time {
     font-size: 12px;
-    color: #999;
+    color: var(--app-text-secondary);
     flex-shrink: 0;
 }
 
 .session-last-msg {
     font-size: 13px;
-    color: #666;
+    color: var(--app-text-secondary);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -721,8 +862,8 @@ export default {
 .session-context-menu {
     position: fixed;
     z-index: 3000;
-    background: #fff;
-    border: 1px solid #e5e7eb;
+    background: var(--app-surface);
+    border: 1px solid var(--app-border);
     border-radius: 8px;
     padding: 6px;
     box-shadow: 0 10px 28px rgba(15, 23, 42, 0.18);
@@ -741,7 +882,7 @@ export default {
 }
 
 .session-context-action:hover {
-    background: #fef2f2;
+    background: rgba(239, 68, 68, 0.08);
 }
 
 .session-context-action:disabled {
@@ -753,6 +894,7 @@ export default {
     flex: 1;
     display: flex;
     flex-direction: column;
+    background: var(--app-surface);
 }
 
 .chat-content {
@@ -765,8 +907,9 @@ export default {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 16px 20px;
-    border-bottom: 1px solid #eee;
+    padding: 14px 18px;
+    border-bottom: 1px solid var(--app-border);
+    background: var(--app-surface);
 }
 
 .chat-user-info {
@@ -776,86 +919,258 @@ export default {
 }
 
 .user-name {
-    font-weight: 500;
-    color: #333;
+    font-weight: 600;
+    color: var(--app-text);
 }
 
 .user-status {
     font-size: 12px;
-    color: #67c23a;
+    color: #22c55e;
 }
 
 .message-list {
     flex: 1;
     overflow-y: auto;
-    padding: 20px;
-    background: #f5f5f5;
+    padding: 18px 20px;
+    background:
+        radial-gradient(circle at 10% 10%, rgba(var(--app-theme-color-rgb), 0.12), transparent 42%),
+        radial-gradient(circle at 94% 88%, rgba(var(--app-theme-color-rgb), 0.08), transparent 40%),
+        var(--app-surface-soft);
 }
 
 .message-item {
     display: flex;
     align-items: flex-start;
-    margin-bottom: 16px;
+    margin-bottom: 18px;
 }
 
 .message-item.sent {
-    flex-direction: row-reverse;
+    justify-content: flex-end;
 }
 
 .message-item.sent .message-body {
     align-items: flex-end;
+    margin: 0 12px 0 0;
 }
 
 .message-avatar {
     flex-shrink: 0;
+    box-shadow: 0 6px 16px rgba(30, 41, 59, 0.14);
 }
 
 .message-body {
     max-width: 60%;
     display: flex;
     flex-direction: column;
-    margin: 0 12px;
+    margin: 0 0 0 12px;
 }
 
 .message-sender {
     font-size: 12px;
-    color: #999;
+    color: var(--app-text-secondary);
     margin-bottom: 4px;
 }
 
 .message-bubble {
-    background: white;
-    padding: 12px 16px;
-    border-radius: 8px;
+    background: var(--app-surface);
+    padding: 11px 14px;
+    border-radius: 14px;
+    border: 1px solid var(--app-border);
+    box-shadow: 0 6px 18px rgba(30, 41, 59, 0.06);
     word-wrap: break-word;
+    line-height: 1.55;
+    color: var(--app-text);
 }
 
 .message-item.sent .message-bubble {
-    background: #409eff;
-    color: white;
+    background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+    color: #fff;
+    border: none;
+    box-shadow: 0 8px 20px rgba(59, 130, 246, 0.24);
+}
+
+.message-item.sent .message-time {
+    text-align: right;
 }
 
 .message-time {
     font-size: 11px;
-    color: #999;
+    color: var(--app-text-secondary);
     margin-top: 4px;
 }
 
 .input-area {
-    border-top: 1px solid #eee;
-    padding: 16px 20px;
-    background: white;
+    border-top: none;
+    padding: 10px 14px 14px;
+    background: transparent;
+}
+
+.composer-panel {
+    --editor-height: 84px;
+    background: var(--app-surface);
+    border: 1px solid var(--app-border);
+    border-radius: 14px;
+    box-shadow: 0 10px 26px rgba(15, 23, 42, 0.12);
+    padding: 8px 12px 10px;
+}
+
+.composer-panel.resizing {
+    user-select: none;
+}
+
+.toolbar-left {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex-shrink: 0;
+}
+
+.tool-btn {
+    color: var(--app-text-secondary);
+    padding: 4px 6px;
+}
+
+.tool-btn:hover {
+    color: var(--app-text);
+}
+
+.composer-editor :deep(.el-textarea__inner) {
+    height: var(--editor-height) !important;
+    min-height: var(--editor-height) !important;
+    max-height: var(--editor-height) !important;
+    resize: none !important;
+    border: none;
+    box-shadow: none;
+    background: transparent;
+    color: var(--app-text);
+    padding: 2px 0 8px;
+    line-height: 1.6;
+    overflow-y: auto;
+}
+
+.composer-editor :deep(.el-textarea__inner:focus) {
+    box-shadow: none;
+}
+
+.composer-resizer {
+    height: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: ns-resize;
+    margin-top: 1px;
+}
+
+.resizer-grip {
+    width: 46px;
+    height: 4px;
+    border-radius: 999px;
+    background: rgba(148, 163, 184, 0.38);
+    transition: background 0.2s ease;
+}
+
+.composer-resizer:hover .resizer-grip,
+.composer-panel.resizing .resizer-grip {
+    background: rgba(148, 163, 184, 0.68);
+}
+
+.composer-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
 }
 
 .input-actions {
     display: flex;
-    justify-content: space-between;
+    justify-content: flex-end;
     align-items: center;
-    margin-top: 12px;
+    margin-top: 0;
+    gap: 10px;
 }
 
-.left-actions {
-    display: flex;
-    gap: 8px;
+.close-btn {
+    min-width: 98px;
+}
+
+.send-wrap {
+    display: inline-flex;
+    align-items: stretch;
+}
+
+.send-wrap .el-button {
+    border-radius: 0;
+}
+
+.send-wrap .el-button:first-child {
+    border-top-left-radius: 10px;
+    border-bottom-left-radius: 10px;
+}
+
+.send-wrap .send-more {
+    width: 40px;
+    padding: 0;
+    border-left: 1px solid rgba(255, 255, 255, 0.45);
+}
+
+.send-wrap .el-button:last-child {
+    border-top-right-radius: 10px;
+    border-bottom-right-radius: 10px;
+}
+
+@media (max-width: 1200px) {
+    .chat-room {
+        margin: -6px -8px 0 -8px;
+    }
+
+    .chat-card {
+        height: calc(100vh - 156px);
+    }
+
+    .chat-sidebar {
+        width: 300px;
+    }
+
+    .message-body {
+        max-width: 74%;
+    }
+
+    .composer-panel {
+        --editor-height: 80px;
+    }
+}
+
+@media (max-width: 900px) {
+    .chat-room {
+        margin: 0;
+    }
+
+    .chat-card {
+        height: calc(100vh - 154px);
+        border-radius: 14px;
+    }
+
+    .chat-container {
+        flex-direction: column;
+    }
+
+    .chat-sidebar {
+        width: 100%;
+        max-height: 36%;
+        border-right: none;
+        border-bottom: 1px solid var(--app-border);
+    }
+
+    .message-list {
+        padding: 14px;
+    }
+
+    .message-body {
+        max-width: 82%;
+    }
+
+    .composer-panel {
+        --editor-height: 72px;
+    }
 }
 </style>

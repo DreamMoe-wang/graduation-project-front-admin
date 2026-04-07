@@ -12,6 +12,9 @@ function createDefaultFormData() {
     clientName: '',
     clientPhone: '',
     amount: 0,
+    location: '',
+    cityName: '',
+    areaName: '',
     description: ''
   }
 }

@@ -4,6 +4,7 @@ import {
   getChatMessages,
   getChatSessions,
   markChatSessionRead,
+  openOrderChatSession,
   openTradeChatSession,
   sendChatMessage
 } from '@/api/chat'
@@ -85,6 +86,17 @@ export const useChatStore = defineStore('chat', {
       this.searchKeyword = ''
 
       const session = await openTradeChatSession(tradeId)
+      return this.activateOpenedSession(session)
+    },
+    async openOrderSessionByOrderId(orderId) {
+      if (!orderId) return null
+
+      this.searchKeyword = ''
+
+      const session = await openOrderChatSession(orderId)
+      return this.activateOpenedSession(session)
+    },
+    async activateOpenedSession(session) {
       await this.fetchSessions(true)
 
       const targetSession = this.sessionList.find(item => Number(item.id) === Number(session?.id))

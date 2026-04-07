@@ -83,6 +83,10 @@
                                 <span class="value">{{ item.createTime }}</span>
                             </div>
                             <div class="info-row">
+                                <span class="label">位置：</span>
+                                <span class="value desc">{{ item.location || '未填写' }}</span>
+                            </div>
+                            <div class="info-row">
                                 <span class="label">备注：</span>
                                 <span class="value desc">{{ item.description || '无' }}</span>
                             </div>
@@ -148,6 +152,9 @@
                 </el-descriptions-item>
                 <el-descriptions-item label="交易金额">
                     <span class="amount-red">¥{{ formatAmount(currentRow.amount) }}</span>
+                </el-descriptions-item>
+                <el-descriptions-item label="位置" :span="2">
+                    {{ currentRow.location || '未填写' }}
                 </el-descriptions-item>
                 <el-descriptions-item label="发布时间">{{ currentRow.createTime }}</el-descriptions-item>
                 <el-descriptions-item label="备注说明" :span="2">

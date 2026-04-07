@@ -100,6 +100,11 @@
         <el-table-column prop="title" label="标题" min-width="180" show-overflow-tooltip />
         <el-table-column prop="clientName" label="委托人" width="100" />
         <el-table-column prop="clientPhone" label="委托人电话" width="130" />
+        <el-table-column prop="location" label="位置" min-width="180" show-overflow-tooltip>
+          <template #default="{ row }">
+            <span>{{ row.location || '-' }}</span>
+          </template>
+        </el-table-column>
         <el-table-column prop="workerName" label="接单人" width="100">
           <template #default="{ row }">
             <span>{{ row.workerName || '-' }}</span>
@@ -180,6 +185,9 @@
         </el-descriptions-item>
         <el-descriptions-item label="接单人电话">
           {{ currentRow.workerPhone || '暂无' }}
+        </el-descriptions-item>
+        <el-descriptions-item label="位置" :span="2">
+          {{ currentRow.location || '未填写' }}
         </el-descriptions-item>
         <el-descriptions-item label="交易金额">
           <span class="amount-red">{{ formatAmount(currentRow.amount) }}</span>

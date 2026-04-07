@@ -29,8 +29,9 @@ export function loginUser(data = {}) {
   })
 }
 
-export function getUserDetail(id) {
+export function getUserDetail(id, config = {}) {
   return request({
+    ...config,
     url: `/user/${id}`,
     method: 'get'
   })
@@ -51,39 +52,44 @@ export function updateCurrentUserProfile(data) {
   })
 }
 
-export function getUserPage(params) {
+export function getUserPage(params, config = {}) {
   return request({
+    ...config,
     url: '/user/page',
     method: 'get',
     params: normalizePageQuery(params)
   })
 }
 
-export function getUserList() {
+export function getUserList(config = {}) {
   return request({
+    ...config,
     url: '/user/list',
     method: 'get'
   })
 }
 
-export function createUser(data) {
+export function createUser(data, config = {}) {
   return request({
+    ...config,
     url: '/user',
     method: 'post',
     data
   })
 }
 
-export function updateUser(id, data) {
+export function updateUser(id, data, config = {}) {
   return request({
+    ...config,
     url: `/user/${id}`,
     method: 'put',
     data
   })
 }
 
-export function deleteUser(id) {
+export function deleteUser(id, config = {}) {
   return request({
+    ...config,
     url: `/user/${id}`,
     method: 'delete'
   })

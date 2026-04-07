@@ -75,20 +75,14 @@ const routes = [
       {
         path: 'role',
         name: 'RoleManage',
-        component: () => import('@/views/role/RoleManage.vue'),
-        meta: { title: '角色管理' }
+        redirect: '/user',
+        meta: { title: '用户管理', menuPath: '/user' }
       },
       {
         path: 'menu',
         name: 'MenuManage',
         component: () => import('@/views/menu/MenuManage.vue'),
         meta: { title: '菜单管理' }
-      },
-      {
-        path: 'dict',
-        name: 'DictManage',
-        component: () => import('@/views/dict/DictManage.vue'),
-        meta: { title: '字典管理' }
       },
       {
         path: 'notice',
@@ -117,15 +111,20 @@ const router = createRouter({
   routes
 })
 
+function normalizeAccessiblePath(path = '') {
+  return path === '/role' ? '/user' : path
+}
+
 function collectAccessibleMenuPaths(menus = [], result = []) {
   for (const item of menus || []) {
     if (!item) continue
 
     const hasChildren = Array.isArray(item.children) && item.children.length > 0
-    const isPageMenu = item.menuType === 2 && item.path
+    const normalizedPath = normalizeAccessiblePath(item.path)
+    const isPageMenu = item.menuType === 2 && normalizedPath
 
     if (isPageMenu) {
-      result.push(item.path)
+      result.push(normalizedPath)
     }
 
     if (hasChildren) {
@@ -175,7 +174,8 @@ router.beforeEach(async to => {
   }
 
   const allowedPaths = Array.from(new Set(collectAccessibleMenuPaths(authStore.currentMenus)))
-  const requiredMenuPath = typeof to.meta.menuPath === 'string' ? to.meta.menuPath : to.path
+  const targetMenuPath = typeof to.meta.menuPath === 'string' ? to.meta.menuPath : to.path
+  const requiredMenuPath = normalizeAccessiblePath(targetMenuPath)
 
   if (requiredMenuPath && !allowedPaths.includes(requiredMenuPath)) {
     const redirectPath = resolveRedirectPath(allowedPaths)

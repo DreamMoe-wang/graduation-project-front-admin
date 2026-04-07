@@ -17,6 +17,22 @@ import {
   setToken as saveToken
 } from '@/utils/auth'
 
+const REMOVED_MENU_PATHS = new Set(['/dict'])
+const REMOVED_PERMISSION_CODES = new Set(['dict:manage'])
+
+function filterRemovedMenus(items = []) {
+  return (Array.isArray(items) ? items : [])
+    .filter(item => item && !REMOVED_MENU_PATHS.has(item.path))
+    .map(item => ({
+      ...item,
+      children: filterRemovedMenus(item.children)
+    }))
+}
+
+function filterRemovedPermissions(items = []) {
+  return (Array.isArray(items) ? items : []).filter(item => !REMOVED_PERMISSION_CODES.has(item))
+}
+
 function createDevMenus() {
   return [
     {
@@ -87,6 +103,28 @@ function createDevMenus() {
       children: []
     },
     {
+      id: 1007,
+      parentId: 0,
+      name: '用户管理',
+      menuType: 2,
+      path: '/user',
+      routeName: 'UserManage',
+      component: 'user/UserManage',
+      icon: 'User',
+      children: []
+    },
+    {
+      id: 1009,
+      parentId: 0,
+      name: '菜单管理',
+      menuType: 2,
+      path: '/menu',
+      routeName: 'MenuManage',
+      component: 'menu/MenuManage',
+      icon: 'Menu',
+      children: []
+    },
+    {
       id: 1030,
       parentId: 0,
       name: '个人中心',
@@ -131,8 +169,10 @@ function createDevBypassUser() {
       'trade:review',
       'user:manage',
       'role:manage',
-      'menu:manage',
-      'dict:manage',
+      'menu:view',
+      'menu:create',
+      'menu:edit',
+      'menu:delete',
       'notice:manage',
       'log:manage',
       'setting:manage'
@@ -160,8 +200,8 @@ function normalizeAuthUser(payload = {}) {
 export const useAuthStore = defineStore('auth', () => {
   const user = ref(getStoredUser())
   const token = ref(getToken())
-  const menus = ref(getStoredMenus())
-  const permissions = ref(getStoredPermissions())
+  const menus = ref(filterRemovedMenus(getStoredMenus()))
+  const permissions = ref(filterRemovedPermissions(getStoredPermissions()))
 
   const isLoggedIn = computed(() => !!token.value)
   const currentUser = computed(() => user.value)
@@ -180,12 +220,12 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   function setMenus(nextMenus) {
-    menus.value = Array.isArray(nextMenus) ? nextMenus : []
+    menus.value = filterRemovedMenus(nextMenus)
     setStoredMenus(menus.value)
   }
 
   function setPermissions(nextPermissions) {
-    permissions.value = Array.isArray(nextPermissions) ? nextPermissions : []
+    permissions.value = filterRemovedPermissions(nextPermissions)
     setStoredPermissions(permissions.value)
   }
 

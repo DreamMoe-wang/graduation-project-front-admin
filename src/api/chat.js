@@ -1,7 +1,8 @@
 import request from '@/utils/request'
 
-export function getChatSessions(params) {
+export function getChatSessions(params, config = {}) {
   return request({
+    ...config,
     url: '/chat/sessions',
     method: 'get',
     params
@@ -11,6 +12,13 @@ export function getChatSessions(params) {
 export function openTradeChatSession(tradeId) {
   return request({
     url: `/chat/trade/${tradeId}/session`,
+    method: 'post'
+  })
+}
+
+export function openOrderChatSession(orderId) {
+  return request({
+    url: `/chat/order/${orderId}/session`,
     method: 'post'
   })
 }

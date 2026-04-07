@@ -48,6 +48,13 @@ export function completeTradeOrder(id) {
   })
 }
 
+export function payTradeOrder(id) {
+  return request({
+    url: `/trade/order/${id}/pay`,
+    method: 'post'
+  })
+}
+
 export function cancelTradeOrder(id) {
   return request({
     url: `/trade/order/${id}/cancel`,
