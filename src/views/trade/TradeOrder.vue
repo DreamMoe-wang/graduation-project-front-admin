@@ -1,13 +1,20 @@
 <template>
   <div class="trade-order">
-    <el-tabs v-model="activeOrderRole" class="role-tabs" @tab-change="handleRoleChange">
-      <el-tab-pane label="我发布的" name="publisher" />
-      <el-tab-pane label="我接取的" name="receiver" />
-    </el-tabs>
+    <div class="order-role-header">
+      <div>
+        <h2 class="order-role-title">{{ pageTitle }}</h2>
+        <p class="order-role-subtitle">{{ pageSubtitle }}</p>
+      </div>
+      <el-segmented
+        v-model="activeOrderRole"
+        :options="roleOptions"
+        class="role-switch"
+        @change="handleRoleChange"
+      />
+    </div>
 
-    <!-- 订单统计 -->
     <el-row :gutter="20" class="stats-row">
-      <el-col :span="4">
+      <el-col :xs="12" :sm="8" :md="8" :lg="4" :xl="4">
         <el-card shadow="hover" class="stat-card">
           <div class="stat-item">
             <div class="stat-label">全部订单</div>
@@ -15,15 +22,15 @@
           </div>
         </el-card>
       </el-col>
-      <el-col :span="4">
+      <el-col :xs="12" :sm="8" :md="8" :lg="4" :xl="4">
         <el-card shadow="hover" class="stat-card">
-            <div class="stat-item">
+          <div class="stat-item">
             <div class="stat-label">待确认</div>
             <div class="stat-value stat-pending">{{ displayOrderStats.pendingCount }}</div>
           </div>
         </el-card>
       </el-col>
-      <el-col :span="4">
+      <el-col :xs="12" :sm="8" :md="8" :lg="4" :xl="4">
         <el-card shadow="hover" class="stat-card">
           <div class="stat-item">
             <div class="stat-label">进行中</div>
@@ -31,7 +38,7 @@
           </div>
         </el-card>
       </el-col>
-      <el-col :span="4">
+      <el-col :xs="12" :sm="8" :md="8" :lg="4" :xl="4">
         <el-card shadow="hover" class="stat-card">
           <div class="stat-item">
             <div class="stat-label">待支付</div>
@@ -39,7 +46,7 @@
           </div>
         </el-card>
       </el-col>
-      <el-col :span="4">
+      <el-col :xs="12" :sm="8" :md="8" :lg="4" :xl="4">
         <el-card shadow="hover" class="stat-card">
           <div class="stat-item">
             <div class="stat-label">已完成</div>
@@ -51,29 +58,25 @@
 
     <div v-loading="loading">
       <template v-if="visibleOrderList.length">
-        <!-- 订单列表 -->
-        <el-card class="order-card" v-for="item in visibleOrderList" :key="item.id">
+        <el-card v-for="item in visibleOrderList" :key="item.id" class="order-card">
           <div class="order-header">
             <span class="order-no">订单号：{{ item.orderNo }}</span>
             <el-tag :type="getStatusType(getDisplayOrderStatus(item))" size="small">
               {{ getStatusText(getDisplayOrderStatus(item)) }}
             </el-tag>
           </div>
+
           <div class="order-content">
             <div class="order-left">
               <h3 class="order-title">{{ item.title }}</h3>
               <p class="order-info">
                 <span>
-                  <el-icon>
-                    <Location />
-                  </el-icon>
-                  {{ item.area }}
+                  <el-icon><Location /></el-icon>
+                  {{ item.area || '暂无区域' }}
                 </span>
                 <span>
-                  <el-icon>
-                    <Clock />
-                  </el-icon>
-                  {{ item.createTime }}
+                  <el-icon><Clock /></el-icon>
+                  {{ item.createTime || '暂无时间' }}
                 </span>
               </p>
             </div>
@@ -81,6 +84,7 @@
               <div class="order-price">¥{{ formatPrice(item.price) }}</div>
             </div>
           </div>
+
           <div class="order-actions">
             <el-button
               v-if="canReceive(item)"
@@ -193,30 +197,64 @@
         <el-descriptions-item label="支付时间">
           {{ currentOrder.payTime || '暂无' }}
         </el-descriptions-item>
+        <el-descriptions-item label="图片信息">
+          <div v-if="currentOrder.imageUrls?.length" class="detail-image-list">
+            <el-image
+              v-for="(url, index) in currentOrder.imageUrls"
+              :key="`${url}-${index}`"
+              :src="url"
+              :preview-src-list="currentOrder.imageUrls"
+              preview-teleported
+              fit="cover"
+              class="detail-image"
+            />
+          </div>
+          <span v-else>无</span>
+        </el-descriptions-item>
       </el-descriptions>
     </el-dialog>
   </div>
 </template>
 
 <script>
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { Clock, Location } from '@element-plus/icons-vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { getOrderStatusText, getOrderStatusType } from '@/config/statusConfig'
 import { formatCurrency } from '@/utils/format'
 import { useAuthStore } from '@/stores/auth'
 import { useTradeOrderStore } from '@/stores/tradeOrder'
 
+const ROLE_ROUTE_MAP = {
+  publisher: '/trade/order/publish',
+  receiver: '/trade/order/receive'
+}
+
+function resolveOrderRoleByPath(path = '') {
+  return path === ROLE_ROUTE_MAP.receiver ? 'receiver' : 'publisher'
+}
+
 export default {
   name: 'TradeOrder',
+  components: {
+    Clock,
+    Location
+  },
   setup() {
     const store = useTradeOrderStore()
     const authStore = useAuthStore()
+    const route = useRoute()
     const router = useRouter()
-    const { loading, orderStats, orderList, pagination, detailVisible, currentOrder } = storeToRefs(store)
+    const { loading, orderList, pagination, detailVisible, currentOrder } = storeToRefs(store)
     const { currentUser } = storeToRefs(authStore)
-    const activeOrderRole = ref('publisher')
+    const activeOrderRole = ref(resolveOrderRoleByPath(route.path))
+
+    const roleOptions = [
+      { label: '发布订单', value: 'publisher' },
+      { label: '接取订单', value: 'receiver' }
+    ]
 
     const normalizeUserId = value => {
       if (value == null || value === '') {
@@ -228,6 +266,10 @@ export default {
     }
 
     const currentUserId = computed(() => normalizeUserId(currentUser.value?.userId ?? currentUser.value?.id))
+    const pageTitle = computed(() => (activeOrderRole.value === 'publisher' ? '发布订单' : '接取订单'))
+    const pageSubtitle = computed(() => (activeOrderRole.value === 'publisher'
+      ? '查看自己发布的全部订单及支付进度'
+      : '查看自己接取的订单并处理履约状态'))
 
     const extractOrderId = item => normalizeUserId(item?.id ?? item?.orderId)
     const extractOrderUserId = profile => normalizeUserId(profile?.userId ?? profile?.id)
@@ -241,9 +283,11 @@ export default {
       return orderList.value.filter(item => {
         const publisherId = extractOrderUserId(item?.publisher)
         const receiverId = extractOrderUserId(item?.receiver)
+
         if (activeOrderRole.value === 'publisher') {
           return publisherId === currentUserId.value
         }
+
         return receiverId === currentUserId.value
       })
     })
@@ -255,6 +299,7 @@ export default {
     const displayOrderStats = computed(() => visibleOrderList.value.reduce((stats, item) => {
       const displayStatus = getDisplayOrderStatus(item)
       stats.totalCount += 1
+
       if (displayStatus === 'pending') {
         stats.pendingCount += 1
       } else if (displayStatus === 'progress') {
@@ -264,6 +309,7 @@ export default {
       } else if (displayStatus === 'success') {
         stats.successCount += 1
       }
+
       return stats
     }, {
       totalCount: 0,
@@ -275,38 +321,55 @@ export default {
 
     const canReceive = item => item?.status === 'pending' && activeOrderRole.value === 'receiver'
     const isReceiver = item => currentUserId.value && extractOrderUserId(item?.receiver) === currentUserId.value
+
     const canComplete = item => {
       if (item?.status !== 'progress' || !currentUserId.value) {
         return false
       }
+
       return isReceiver(item)
     }
+
     const canCancel = item => {
       if (!currentUserId.value) {
         return false
       }
+
       const canCancelStatus = item?.status === 'pending' || item?.status === 'progress'
       if (!canCancelStatus) {
         return false
       }
+
       return isReceiver(item)
     }
+
     const canPay = item => {
       if (!currentUserId.value) {
         return false
       }
+
       const isPublisher = extractOrderUserId(item?.publisher) === currentUserId.value
       if (!isPublisher) {
         return false
       }
+
       return getDisplayOrderStatus(item) === 'pay_pending'
     }
 
-    const handleRoleChange = async () => {
+    const syncRoleByRoute = path => {
+      activeOrderRole.value = resolveOrderRoleByPath(path)
+    }
+
+    const handleRoleChange = async role => {
+      const targetPath = ROLE_ROUTE_MAP[role] || ROLE_ROUTE_MAP.publisher
+      if (route.path !== targetPath) {
+        await router.push(targetPath)
+      }
+
       try {
         await store.setCurrentPage(1)
       } catch (error) {
-        console.error('切换订单标签失败:', error)
+        console.error('切换订单菜单失败:', error)
       }
     }
 
@@ -349,7 +412,7 @@ export default {
       const actionText = item?.status === 'pending' ? '退单' : '取消订单'
 
       try {
-        await ElMessageBox.confirm(`确定要${actionText}"${item.orderNo}"吗？`, '提示', {
+        await ElMessageBox.confirm(`确定要${actionText}“${item.orderNo}”吗？`, '提示', {
           confirmButtonText: '确定',
           cancelButtonText: '取消',
           type: 'warning'
@@ -379,7 +442,7 @@ export default {
           ...(tradeId ? { tradeId } : {})
         }
       })
-      ElMessage.info('已跳转到聊天室，正在打开与对方的订单会话')
+      ElMessage.info('已跳转到聊天室，正在打开对应订单会话')
     }
 
     const handleSizeChange = async val => {
@@ -403,16 +466,28 @@ export default {
       if (!item) {
         return ''
       }
+
       if (item.status === 'success' && (item.payStatus || 'unpaid') === 'unpaid') {
         return 'pay_pending'
       }
+
       return item.status
     }
+
     const getStatusType = status => getOrderStatusType(status)
     const getStatusText = status => getOrderStatusText(status)
     const isActionLoading = (id, type) => store.isActionLoading(id, type)
 
+    watch(
+      () => route.path,
+      path => {
+        syncRoleByRoute(path)
+      }
+    )
+
     onMounted(async () => {
+      syncRoleByRoute(route.path)
+
       try {
         await store.fetchData()
       } catch (error) {
@@ -426,10 +501,11 @@ export default {
 
     return {
       loading,
-      orderStats,
-      orderList,
-      visibleOrderList,
+      roleOptions,
       activeOrderRole,
+      pageTitle,
+      pageSubtitle,
+      visibleOrderList,
       emptyDescription,
       displayOrderStats,
       pagination,
@@ -463,8 +539,29 @@ export default {
   padding: 20px;
 }
 
-.role-tabs {
-  margin-bottom: 16px;
+.order-role-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.order-role-title {
+  margin: 0;
+  font-size: 24px;
+  line-height: 1.2;
+  color: #1f2937;
+}
+
+.order-role-subtitle {
+  margin: 8px 0 0;
+  color: #6b7280;
+  font-size: 14px;
+}
+
+.role-switch {
+  flex-shrink: 0;
 }
 
 .stats-row {
@@ -528,32 +625,47 @@ export default {
 .order-content {
   display: flex;
   justify-content: space-between;
+  gap: 16px;
   margin-bottom: 16px;
 }
 
+.order-left {
+  min-width: 0;
+}
+
 .order-title {
+  margin: 0 0 8px;
   font-size: 16px;
   color: #333;
-  margin-bottom: 8px;
 }
 
 .order-info {
+  margin: 0;
   color: #666;
   font-size: 13px;
   display: flex;
   gap: 16px;
+  flex-wrap: wrap;
+}
+
+.order-info span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .order-price {
   font-size: 24px;
   color: #f56c6c;
   font-weight: bold;
+  white-space: nowrap;
 }
 
 .order-actions {
   display: flex;
   gap: 12px;
   justify-content: flex-end;
+  flex-wrap: wrap;
   padding-top: 12px;
   border-top: 1px solid #eee;
 }
@@ -567,5 +679,33 @@ export default {
 .price-text {
   color: #f56c6c;
   font-weight: bold;
+}
+
+.detail-image-list {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.detail-image {
+  width: 88px;
+  height: 88px;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+@media (max-width: 768px) {
+  .order-role-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .order-content {
+    flex-direction: column;
+  }
+
+  .order-actions {
+    justify-content: flex-start;
+  }
 }
 </style>

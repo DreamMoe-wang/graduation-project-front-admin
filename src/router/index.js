@@ -50,9 +50,20 @@ const routes = [
       },
       {
         path: 'trade/order',
-        name: 'TradeOrder',
+        redirect: '/trade/order/publish',
+        meta: { title: '我的订单', menuPath: '/trade/order' }
+      },
+      {
+        path: 'trade/order/publish',
+        name: 'TradeOrderPublish',
         component: () => import('@/views/trade/TradeOrder.vue'),
-        meta: { title: '订单大全' }
+        meta: { title: '发布订单', menuPath: '/trade/order/publish' }
+      },
+      {
+        path: 'trade/order/receive',
+        name: 'TradeOrderReceive',
+        component: () => import('@/views/trade/TradeOrder.vue'),
+        meta: { title: '接取订单', menuPath: '/trade/order/receive' }
       },
       {
         path: 'chat',

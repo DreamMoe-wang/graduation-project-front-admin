@@ -157,6 +157,20 @@
                     {{ currentRow.location || '未填写' }}
                 </el-descriptions-item>
                 <el-descriptions-item label="发布时间">{{ currentRow.createTime }}</el-descriptions-item>
+                <el-descriptions-item label="图片信息" :span="2">
+                    <div v-if="currentRow.imageUrls?.length" class="detail-image-list">
+                        <el-image
+                            v-for="(url, index) in currentRow.imageUrls"
+                            :key="`${url}-${index}`"
+                            :src="url"
+                            :preview-src-list="currentRow.imageUrls"
+                            preview-teleported
+                            fit="cover"
+                            class="detail-image"
+                        />
+                    </div>
+                    <span v-else>无</span>
+                </el-descriptions-item>
                 <el-descriptions-item label="备注说明" :span="2">
                     {{ currentRow.description || '无' }}
                 </el-descriptions-item>
@@ -483,5 +497,18 @@ export default {
     color: #f56c6c;
     font-weight: bold;
     font-size: 14px;
+}
+
+.detail-image-list {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.detail-image {
+    width: 88px;
+    height: 88px;
+    border-radius: 10px;
+    overflow: hidden;
 }
 </style>

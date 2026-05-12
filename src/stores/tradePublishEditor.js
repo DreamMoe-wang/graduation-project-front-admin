@@ -15,7 +15,8 @@ function createDefaultFormData() {
     location: '',
     cityName: '',
     areaName: '',
-    description: ''
+    description: '',
+    imageUrls: []
   }
 }
 
@@ -23,7 +24,8 @@ function normalizeFormData(data = {}) {
   return {
     ...createDefaultFormData(),
     ...data,
-    amount: data.amount != null ? Number(data.amount) : 0
+    amount: data.amount != null ? Number(data.amount) : 0,
+    imageUrls: Array.isArray(data.imageUrls) ? data.imageUrls.filter(Boolean) : []
   }
 }
 

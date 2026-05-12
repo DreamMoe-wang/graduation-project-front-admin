@@ -123,12 +123,12 @@
                 </el-form-item>
               </el-col>
 
-              <el-col :xs="24" :md="12">
+              <el-col :xs="24" :md="24">
                 <el-form-item label="定位区域" prop="areaName">
                   <div class="location-row">
                     <el-input
                       :model-value="locationText"
-                      placeholder="点击右侧按钮使用百度定位"
+                      placeholder="点击右侧按钮定位，或使用地图选点手动确认"
                       readonly
                     />
                     <el-button
@@ -137,8 +137,9 @@
                       :loading="locating"
                       @click="handleLocate"
                     >
-                      {{ locating ? '定位中...' : '百度定位' }}
+                      {{ locating ? '定位中...' : '定位' }}
                     </el-button>
+                    <el-button plain @click="locationPickerVisible = true">地图选点</el-button>
                   </div>
                 </el-form-item>
               </el-col>
@@ -171,11 +172,18 @@
         </el-card>
       </el-col>
     </el-row>
+
+    <BaiduLocationPicker
+      v-model="locationPickerVisible"
+      :initial-location="profile"
+      @confirm="handleLocationPicked"
+    />
   </div>
 </template>
 
 <script>
 import { Plus } from '@element-plus/icons-vue'
+import BaiduLocationPicker from '@/components/BaiduLocationPicker.vue'
 import { locateByIp, reverseGeocodeLocation } from '@/api/location'
 import { uploadOssFile } from '@/api/oss'
 import { getCurrentUserProfile, updateCurrentUserProfile } from '@/api/user'
@@ -201,10 +209,17 @@ function createDefaultProfile() {
   }
 }
 
+function shouldSkipIpLocate() {
+  if (typeof window === 'undefined') return false
+  const hostname = window.location.hostname
+  return hostname === 'localhost' || hostname === '127.0.0.1'
+}
+
 export default {
   name: 'ProfileCenter',
   components: {
-    Plus
+    Plus,
+    BaiduLocationPicker
   },
   data() {
     return {
@@ -212,6 +227,7 @@ export default {
       saving: false,
       uploadingAvatar: false,
       locating: false,
+      locationPickerVisible: false,
       profile: createDefaultProfile(),
       originalProfile: createDefaultProfile(),
       rules: {
@@ -324,14 +340,19 @@ export default {
           latitude: position.latitude,
           longitude: position.longitude
         }, { silent: true })
-        this.applyLocationResult(location)
+        this.applyLocationResult(location, false)
       } catch (error) {
-        try {
-          const fallbackLocation = await locateByIp({ silent: true })
-          this.applyLocationResult(fallbackLocation, true)
-        } catch (fallbackError) {
-          this.$message.error(error?.message || fallbackError?.message || '定位失败，请稍后重试')
-          console.error('Locate failed:', error, fallbackError)
+        if (shouldSkipIpLocate()) {
+          this.$message.error(error?.message || '定位失败，请稍后重试')
+          console.error('Locate failed:', error)
+        } else {
+          try {
+            const fallbackLocation = await locateByIp({ silent: true })
+            this.applyLocationResult(fallbackLocation, true)
+          } catch (fallbackError) {
+            this.$message.error(error?.message || fallbackError?.message || '定位失败，请稍后重试')
+            console.error('Locate failed:', error, fallbackError)
+          }
         }
       } finally {
         this.locating = false
@@ -372,7 +393,13 @@ export default {
       this.profile.address = location?.address || this.profile.address
 
       const locationLabel = [location?.cityName, location?.areaName].filter(Boolean).join(' ') || '当前位置'
-      this.$message.success(byIp ? `已根据 IP 定位：${locationLabel}` : `定位成功：${locationLabel}`)
+      this.$message.success(byIp ? `已根据本机 IP 定位：${locationLabel}` : `已根据浏览器定位：${locationLabel}`)
+    },
+    handleLocationPicked(location) {
+      this.profile.cityName = location?.cityName || ''
+      this.profile.areaName = location?.areaName || ''
+      this.profile.address = location?.address || ''
+      this.$message.success(`已手动确认位置：${location?.address || '当前位置'}`)
     },
     syncAuthUserProfile() {
       const currentUser = this.authStore.currentUser || {}

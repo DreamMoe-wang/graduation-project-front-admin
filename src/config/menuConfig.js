@@ -21,11 +21,23 @@ export default [
         path: '/trade/list',
         name: '交易大全',
         icon: 'List'
+      }
+    ]
+  },
+  {
+    path: '/trade/order',
+    name: '我的订单',
+    icon: 'Document',
+    children: [
+      {
+        path: '/trade/order/publish',
+        name: '发布订单',
+        icon: 'Document'
       },
       {
-        path: '/trade/order',
-        name: '订单大全',
-        icon: 'Document'
+        path: '/trade/order/receive',
+        name: '接取订单',
+        icon: 'Tickets'
       }
     ]
   },

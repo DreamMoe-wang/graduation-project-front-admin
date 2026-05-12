@@ -24,9 +24,9 @@ VALUES
     (1021, 1004, '交易大全编辑按钮', 3, NULL, NULL, NULL, NULL, 'trade:list:edit', 2, 0, 1, '交易大全页-编辑按钮'),
     (1022, 1004, '交易大全删除按钮', 3, NULL, NULL, NULL, NULL, 'trade:list:delete', 3, 0, 1, '交易大全页-删除按钮'),
     (1023, 1004, '接取交易按钮', 3, NULL, NULL, NULL, NULL, 'trade:list:take', 4, 0, 1, '交易大全页-接取按钮'),
-    (1024, 1005, '订单接单按钮', 3, NULL, NULL, NULL, NULL, 'trade:order:receive', 1, 0, 1, '订单大全页-接单按钮'),
-    (1025, 1005, '订单完成按钮', 3, NULL, NULL, NULL, NULL, 'trade:order:complete', 2, 0, 1, '订单大全页-完成任务按钮'),
-    (1026, 1005, '订单取消按钮', 3, NULL, NULL, NULL, NULL, 'trade:order:cancel', 3, 0, 1, '订单大全页-取消订单按钮'),
+    (1024, 1032, '订单接单按钮', 3, NULL, NULL, NULL, NULL, 'trade:order:receive', 1, 0, 1, '接取订单页-接单按钮'),
+    (1025, 1032, '订单完成按钮', 3, NULL, NULL, NULL, NULL, 'trade:order:complete', 2, 0, 1, '接取订单页-完成任务按钮'),
+    (1026, 1032, '订单取消按钮', 3, NULL, NULL, NULL, NULL, 'trade:order:cancel', 3, 0, 1, '接取订单页-取消订单按钮'),
     (1027, 1006, '联系对方按钮', 3, NULL, NULL, NULL, NULL, 'chat:contact', 1, 0, 1, '交易/订单页-联系对方按钮')
 ON DUPLICATE KEY UPDATE
     `parent_id` = VALUES(`parent_id`),

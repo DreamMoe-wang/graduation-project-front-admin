@@ -40,7 +40,7 @@
           <div class="location-row">
             <el-input
               v-model="formData.location"
-              placeholder="请输入位置，或点击右侧按钮自动定位"
+              placeholder="请输入位置，或点击右侧按钮定位 / 地图选点"
               @input="handleLocationInput"
             />
             <el-button
@@ -49,7 +49,10 @@
               :loading="locating"
               @click="handleLocate"
             >
-              {{ locating ? '定位中...' : '百度定位' }}
+              {{ locating ? '定位中...' : '定位' }}
+            </el-button>
+            <el-button plain @click="locationPickerVisible = true">
+              地图选点
             </el-button>
           </div>
         </el-form-item>
@@ -62,6 +65,24 @@
             controls-position="right"
             style="width: 100%"
           />
+        </el-form-item>
+
+        <el-form-item label="图片信息">
+          <div class="image-upload-block">
+            <el-upload
+              list-type="picture-card"
+              :file-list="uploadFileList"
+              :http-request="handleImageUpload"
+              :before-upload="beforeImageUpload"
+              :on-remove="handleRemoveImage"
+              :on-preview="handlePreviewImage"
+              accept="image/*"
+              multiple
+            >
+              <el-icon><Plus /></el-icon>
+            </el-upload>
+            <p class="upload-tip">支持多图上传，单张不超过 5MB，建议上传 JPG / PNG / WEBP。</p>
+          </div>
         </el-form-item>
 
         <el-form-item label="备注说明" prop="description">
@@ -94,18 +115,37 @@
         </el-button>
       </div>
     </el-card>
+
+    <el-dialog v-model="previewVisible" title="图片预览" width="720px">
+      <img v-if="previewImageUrl" :src="previewImageUrl" alt="trade" class="preview-image">
+    </el-dialog>
+
+    <BaiduLocationPicker
+      v-model="locationPickerVisible"
+      :initial-location="formData"
+      @confirm="handleLocationPicked"
+    />
   </div>
 </template>
 
 <script>
-import { onMounted, onUnmounted, ref, watch } from 'vue'
+import { Plus } from '@element-plus/icons-vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
+import BaiduLocationPicker from '@/components/BaiduLocationPicker.vue'
 import { locateByIp, reverseGeocodeLocation } from '@/api/location'
+import { uploadOssFile } from '@/api/oss'
 import { useAuthStore } from '@/stores/auth'
 import { useTradePublishEditorStore } from '@/stores/tradePublishEditor'
 import { emitCloseTag } from '@/utils/tags'
+
+function shouldSkipIpLocate() {
+  if (typeof window === 'undefined') return false
+  const hostname = window.location.hostname
+  return hostname === 'localhost' || hostname === '127.0.0.1'
+}
 
 const formRules = {
   title: [
@@ -126,6 +166,10 @@ const formRules = {
 
 export default {
   name: 'TradePublishForm',
+  components: {
+    Plus,
+    BaiduLocationPicker
+  },
   setup() {
     const authStore = useAuthStore()
     const store = useTradePublishEditorStore()
@@ -134,7 +178,15 @@ export default {
     const formRef = ref(null)
     const pendingAction = ref('')
     const locating = ref(false)
+    const previewVisible = ref(false)
+    const previewImageUrl = ref('')
+    const locationPickerVisible = ref(false)
     const { loading, submitLoading, isEdit, formData } = storeToRefs(store)
+
+    const uploadFileList = computed(() => (formData.value.imageUrls || []).map((url, index) => ({
+      name: `trade-image-${index + 1}`,
+      url
+    })))
 
     const loadPage = async () => {
       const id = route.params.id
@@ -227,7 +279,7 @@ export default {
         || [location?.cityName, location?.areaName].filter(Boolean).join(' ')
         || '当前位置'
 
-      ElMessage.success(byIp ? `已根据 IP 定位：${locationLabel}` : `定位成功：${locationLabel}`)
+      ElMessage.success(byIp ? `已根据本机 IP 定位：${locationLabel}` : `已根据浏览器定位：${locationLabel}`)
     }
 
     const handleLocate = async () => {
@@ -239,14 +291,19 @@ export default {
           latitude: position.latitude,
           longitude: position.longitude
         }, { silent: true })
-        applyLocationResult(location)
+        applyLocationResult(location, false)
       } catch (error) {
-        try {
-          const fallbackLocation = await locateByIp({ silent: true })
-          applyLocationResult(fallbackLocation, true)
-        } catch (fallbackError) {
-          ElMessage.error(error?.message || fallbackError?.message || '定位失败，请稍后重试')
-          console.error('Trade locate failed:', error, fallbackError)
+        if (shouldSkipIpLocate()) {
+          ElMessage.error(error?.message || '定位失败，请稍后重试')
+          console.error('Trade locate failed:', error)
+        } else {
+          try {
+            const fallbackLocation = await locateByIp({ silent: true })
+            applyLocationResult(fallbackLocation, true)
+          } catch (fallbackError) {
+            ElMessage.error(error?.message || fallbackError?.message || '定位失败，请稍后重试')
+            console.error('Trade locate failed:', error, fallbackError)
+          }
         }
       } finally {
         locating.value = false
@@ -256,6 +313,50 @@ export default {
     const handleLocationInput = () => {
       formData.value.cityName = ''
       formData.value.areaName = ''
+    }
+
+    const beforeImageUpload = file => {
+      const isImage = file.type.startsWith('image/')
+      const isLt5M = file.size / 1024 / 1024 < 5
+
+      if (!isImage) {
+        ElMessage.error('只能上传图片文件')
+      }
+      if (!isLt5M) {
+        ElMessage.error('图片大小不能超过 5MB')
+      }
+
+      return isImage && isLt5M
+    }
+
+    const handleImageUpload = async options => {
+      try {
+        const result = await uploadOssFile(options.file, 'trade')
+        const imageUrl = result?.url || ''
+        if (imageUrl) {
+          formData.value.imageUrls = [...(formData.value.imageUrls || []), imageUrl]
+          ElMessage.success('图片上传成功')
+        }
+      } catch (error) {
+        console.error('Trade image upload failed:', error)
+      }
+    }
+
+    const handleRemoveImage = file => {
+      const currentUrls = formData.value.imageUrls || []
+      formData.value.imageUrls = currentUrls.filter(url => url !== file.url)
+    }
+
+    const handlePreviewImage = file => {
+      previewImageUrl.value = file.url
+      previewVisible.value = true
+    }
+
+    const handleLocationPicked = location => {
+      formData.value.cityName = location?.cityName || ''
+      formData.value.areaName = location?.areaName || ''
+      formData.value.location = location?.address || ''
+      ElMessage.success(`已手动确认位置：${location?.address || '当前位置'}`)
     }
 
     onMounted(async () => {
@@ -282,11 +383,20 @@ export default {
       formData,
       pendingAction,
       locating,
+      uploadFileList,
+      previewVisible,
+      previewImageUrl,
+      locationPickerVisible,
       handleCancel,
       handleSaveDraft,
       handleSubmitAudit,
       handleLocate,
-      handleLocationInput
+      handleLocationInput,
+      beforeImageUpload,
+      handleImageUpload,
+      handleRemoveImage,
+      handlePreviewImage,
+      handleLocationPicked
     }
   }
 }
@@ -356,11 +466,28 @@ export default {
   flex: 1;
 }
 
+.image-upload-block {
+  width: 100%;
+}
+
+.upload-tip {
+  margin: 8px 0 0;
+  color: #6b7280;
+  font-size: 13px;
+}
+
 .action-bar {
   display: flex;
   justify-content: flex-end;
   gap: 12px;
   padding-top: 8px;
+}
+
+.preview-image {
+  display: block;
+  width: 100%;
+  max-height: 70vh;
+  object-fit: contain;
 }
 
 @media (max-width: 768px) {

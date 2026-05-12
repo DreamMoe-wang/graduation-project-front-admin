@@ -77,16 +77,39 @@ function createDevMenus() {
           component: 'trade/TradeList',
           icon: 'List',
           children: []
-        },
+        }
+      ]
+    },
+    {
+      id: 1005,
+      parentId: 0,
+      name: '我的订单',
+      menuType: 1,
+      path: '/trade/order',
+      routeName: 'TradeOrder',
+      component: null,
+      icon: 'Document',
+      children: [
         {
-          id: 1005,
-          parentId: 1002,
-          name: '订单大全',
+          id: 1031,
+          parentId: 1005,
+          name: '发布订单',
           menuType: 2,
-          path: '/trade/order',
-          routeName: 'TradeOrder',
+          path: '/trade/order/publish',
+          routeName: 'TradeOrderPublish',
           component: 'trade/TradeOrder',
           icon: 'Document',
+          children: []
+        },
+        {
+          id: 1032,
+          parentId: 1005,
+          name: '接取订单',
+          menuType: 2,
+          path: '/trade/order/receive',
+          routeName: 'TradeOrderReceive',
+          component: 'trade/TradeOrder',
+          icon: 'Tickets',
           children: []
         }
       ]

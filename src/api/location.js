@@ -16,3 +16,11 @@ export function locateByIp(config = {}) {
     method: 'get'
   })
 }
+
+export function getLocationConfig(config = {}) {
+  return request({
+    ...config,
+    url: '/location/config',
+    method: 'get'
+  })
+}

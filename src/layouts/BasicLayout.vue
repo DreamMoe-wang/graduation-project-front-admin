@@ -606,7 +606,7 @@ export default {
             const currentPath = this.$route?.path || ''
             if (!path) return false
             if (path === '/') return currentPath === '/'
-            return currentPath === path || currentPath.startsWith(`${path}/`)
+            return currentPath === path
         },
         isMenuActive(menu) {
             if (!menu) return false
