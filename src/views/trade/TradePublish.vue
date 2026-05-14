@@ -10,6 +10,25 @@
             style="width: 200px"
           />
         </el-form-item>
+        <el-form-item label="交易类型">
+          <el-select
+            v-model="searchForm.categoryNames"
+            multiple
+            collapse-tags
+            collapse-tags-tooltip
+            clearable
+            filterable
+            placeholder="请选择交易类型"
+            style="width: 260px"
+          >
+            <el-option
+              v-for="item in tradeCategoryOptions"
+              :key="item"
+              :label="item"
+              :value="item"
+            />
+          </el-select>
+        </el-form-item>
         <el-form-item label="交易状态">
           <el-select
             v-model="searchForm.status"
@@ -27,15 +46,11 @@
         </el-form-item>
         <el-form-item>
           <el-button type="primary" @click="handleSearch">
-            <el-icon>
-              <Search />
-            </el-icon>
+            <el-icon><Search /></el-icon>
             搜索
           </el-button>
           <el-button @click="handleReset">
-            <el-icon>
-              <Refresh />
-            </el-icon>
+            <el-icon><Refresh /></el-icon>
             重置
           </el-button>
         </el-form-item>
@@ -59,9 +74,7 @@
             type="primary"
             @click="handleAdd"
           >
-            <el-icon>
-              <Plus />
-            </el-icon>
+            <el-icon><Plus /></el-icon>
             发布交易
           </el-button>
           <el-button
@@ -103,6 +116,11 @@
         <el-table-column prop="location" label="位置" min-width="180" show-overflow-tooltip>
           <template #default="{ row }">
             <span>{{ row.location || '-' }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="categoryNames" label="交易类型" min-width="180" show-overflow-tooltip>
+          <template #default="{ row }">
+            <span>{{ (row.categoryNames || []).join(' / ') || '-' }}</span>
           </template>
         </el-table-column>
         <el-table-column prop="workerName" label="接单人" width="100">
@@ -189,6 +207,9 @@
         <el-descriptions-item label="位置" :span="2">
           {{ currentRow.location || '未填写' }}
         </el-descriptions-item>
+        <el-descriptions-item label="交易类型" :span="2">
+          {{ (currentRow.categoryNames || []).join(' / ') || '无' }}
+        </el-descriptions-item>
         <el-descriptions-item label="交易金额">
           <span class="amount-red">{{ formatAmount(currentRow.amount) }}</span>
         </el-descriptions-item>
@@ -223,7 +244,7 @@
 </template>
 
 <script>
-import { computed, onMounted, onUnmounted } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
@@ -235,6 +256,7 @@ import {
 } from '@/config/statusConfig'
 import { formatCurrency } from '@/utils/format'
 import { useTradePublishStore } from '@/stores/tradePublish'
+import { getTradeCategoryList } from '@/api/tradeCategory'
 
 export default {
   name: 'TradePublish',
@@ -246,6 +268,7 @@ export default {
   setup() {
     const store = useTradePublishStore()
     const router = useRouter()
+    const tradeCategoryOptions = ref([])
     const {
       searchForm,
       tableData,
@@ -262,11 +285,21 @@ export default {
       .filter(item => store.isAuditable(item))
       .map(item => item.id))
 
+    const loadTradeCategoryOptions = async () => {
+      try {
+        const list = await getTradeCategoryList()
+        tradeCategoryOptions.value = Array.isArray(list) ? list.map(item => item?.categoryName).filter(Boolean) : []
+      } catch (error) {
+        tradeCategoryOptions.value = []
+        console.error('Load trade categories failed:', error)
+      }
+    }
+
     const handleSearch = async () => {
       try {
         await store.search()
       } catch (error) {
-        console.error('搜索交易发布失败:', error)
+        console.error('Search trade publish failed:', error)
       }
     }
 
@@ -274,7 +307,7 @@ export default {
       try {
         await store.resetSearch()
       } catch (error) {
-        console.error('重置交易发布筛选失败:', error)
+        console.error('Reset trade publish filter failed:', error)
       }
     }
 
@@ -290,13 +323,13 @@ export default {
       try {
         await store.openDetail(row.id)
       } catch (error) {
-        console.error('获取交易详情失败:', error)
+        console.error('Open trade publish detail failed:', error)
       }
     }
 
     const handleDelete = async row => {
       try {
-        await ElMessageBox.confirm(`确定要删除交易"${row.title}"吗？`, '提示', {
+        await ElMessageBox.confirm(`确定要删除交易“${row.title}”吗？`, '提示', {
           confirmButtonText: '确定',
           cancelButtonText: '取消',
           type: 'warning'
@@ -306,7 +339,7 @@ export default {
         ElMessage.success('删除成功')
       } catch (error) {
         if (error !== 'cancel' && error !== 'close') {
-          console.error('删除交易失败:', error)
+          console.error('Delete trade publish failed:', error)
         }
       }
     }
@@ -319,7 +352,7 @@ export default {
 
     const handleApprove = async row => {
       try {
-        await ElMessageBox.confirm(`确认通过交易"${row.title}"的审核吗？`, '审核确认', {
+        await ElMessageBox.confirm(`确认通过交易“${row.title}”的审核吗？`, '审核确认', {
           confirmButtonText: '确定',
           cancelButtonText: '取消',
           type: 'success'
@@ -329,7 +362,7 @@ export default {
         ElMessage.success('审核通过')
       } catch (error) {
         if (error !== 'cancel' && error !== 'close') {
-          console.error('交易审核通过失败:', error)
+          console.error('Approve trade failed:', error)
         }
       }
     }
@@ -347,7 +380,7 @@ export default {
         ElMessage.success('已驳回')
       } catch (error) {
         if (error !== 'cancel' && error !== 'close') {
-          console.error('交易审核驳回失败:', error)
+          console.error('Reject trade failed:', error)
         }
       }
     }
@@ -369,7 +402,7 @@ export default {
         ElMessage.success('批量审核通过完成')
       } catch (error) {
         if (error !== 'cancel' && error !== 'close') {
-          console.error('批量审核通过失败:', error)
+          console.error('Batch approve trade failed:', error)
         }
       }
     }
@@ -392,7 +425,7 @@ export default {
         ElMessage.success('批量驳回完成')
       } catch (error) {
         if (error !== 'cancel' && error !== 'close') {
-          console.error('批量审核驳回失败:', error)
+          console.error('Batch reject trade failed:', error)
         }
       }
     }
@@ -401,7 +434,7 @@ export default {
       try {
         await store.setPageSize(val)
       } catch (error) {
-        console.error('切换交易发布分页大小失败:', error)
+        console.error('Change trade publish page size failed:', error)
       }
     }
 
@@ -409,7 +442,7 @@ export default {
       try {
         await store.setCurrentPage(val)
       } catch (error) {
-        console.error('切换交易发布页码失败:', error)
+        console.error('Change trade publish page failed:', error)
       }
     }
 
@@ -423,9 +456,12 @@ export default {
 
     onMounted(async () => {
       try {
-        await store.fetchData()
+        await Promise.all([
+          store.fetchData(),
+          loadTradeCategoryOptions()
+        ])
       } catch (error) {
-        console.error('获取交易发布列表失败:', error)
+        console.error('Load trade publish list failed:', error)
       }
     })
 
@@ -440,6 +476,7 @@ export default {
       pagination,
       detailVisible,
       currentRow,
+      tradeCategoryOptions,
       handleSearch,
       handleReset,
       handleAdd,
@@ -496,7 +533,7 @@ export default {
 
 .page-title {
   font-size: 16px;
-  font-weight: bold;
+  font-weight: 700;
   color: #303133;
 }
 
@@ -538,7 +575,7 @@ export default {
 
 .amount-red {
   color: #f56c6c;
-  font-weight: bold;
+  font-weight: 700;
   font-size: 14px;
 }
 

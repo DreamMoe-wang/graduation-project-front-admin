@@ -1,4 +1,4 @@
-﻿/**
+/**
  * 侧边栏菜单配置
  */
 export default [
@@ -6,6 +6,11 @@ export default [
     path: '/',
     name: '首页',
     icon: 'HomeFilled'
+  },
+  {
+    path: '/qualification',
+    name: '资格认证',
+    icon: 'Medal'
   },
   {
     path: '/trade',

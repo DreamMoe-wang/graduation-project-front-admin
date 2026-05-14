@@ -25,6 +25,24 @@ const routes = [
         meta: { title: '首页', affix: true }
       },
       {
+        path: 'qualification',
+        name: 'QualificationManage',
+        component: () => import('@/views/qualification/QualificationManage.vue'),
+        meta: { title: '资格认证' }
+      },
+      {
+        path: 'qualification/create',
+        name: 'QualificationCreate',
+        component: () => import('@/views/qualification/QualificationForm.vue'),
+        meta: { title: '发起认证', menuPath: '/qualification' }
+      },
+      {
+        path: 'qualification/edit/:id',
+        name: 'QualificationEdit',
+        component: () => import('@/views/qualification/QualificationForm.vue'),
+        meta: { title: '修改认证', menuPath: '/qualification' }
+      },
+      {
         path: 'trade/publish',
         name: 'TradePublish',
         component: () => import('@/views/trade/TradePublish.vue'),
@@ -47,6 +65,12 @@ const routes = [
         name: 'TradeList',
         component: () => import('@/views/trade/TradeList.vue'),
         meta: { title: '交易大全' }
+      },
+      {
+        path: 'trade/category',
+        name: 'TradeCategoryManage',
+        component: () => import('@/views/trade/TradeCategoryManage.vue'),
+        meta: { title: '交易标签管理', menuPath: '/trade/category' }
       },
       {
         path: 'trade/order',
@@ -88,12 +112,6 @@ const routes = [
         name: 'RoleManage',
         redirect: '/user',
         meta: { title: '用户管理', menuPath: '/user' }
-      },
-      {
-        path: 'menu',
-        name: 'MenuManage',
-        component: () => import('@/views/menu/MenuManage.vue'),
-        meta: { title: '菜单管理' }
       },
       {
         path: 'notice',
@@ -168,8 +186,7 @@ router.beforeEach(async to => {
 
   if (isPublicPage) {
     if (authStore.isLoggedIn) {
-      const redirect = typeof to.query.redirect === 'string' ? to.query.redirect : '/'
-      return redirect === '/login' ? '/' : redirect
+      return '/'
     }
 
     return true
@@ -177,10 +194,7 @@ router.beforeEach(async to => {
 
   if (!authStore.isLoggedIn) {
     return {
-      path: '/login',
-      query: {
-        redirect: to.fullPath
-      }
+      path: '/login'
     }
   }
 

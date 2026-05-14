@@ -201,7 +201,12 @@
                             <div class="quick-setting-group">
                                 <div class="quick-setting-label">{{ t('setting.themeColor') }}</div>
                                 <div class="quick-setting-color">
-                                    <el-color-picker v-model="quickSettingForm.themeColor" @change="handleQuickSettingChange" />
+                                    <el-color-picker
+                                        v-model="quickSettingForm.themeColor"
+                                        :teleported="false"
+                                        popper-class="quick-setting-color-popper"
+                                        @change="handleQuickSettingChange"
+                                    />
                                     <el-input v-model="quickSettingForm.themeColor" class="quick-setting-input" @input="handleQuickSettingChange" />
                                 </div>
                             </div>
@@ -512,6 +517,9 @@ export default {
         },
         totalNotificationCount() {
             return Number(this.unreadMessageCount || 0) + Number(this.visibleRecentNotices.length || 0)
+        },
+        canManageSystemSetting() {
+            return this.authStore.hasPermission('setting:manage')
         }
     },
     watch: {
@@ -593,8 +601,10 @@ export default {
                 await this.systemSettingStore.saveSettings({
                     ...this.systemSettingStore.settings,
                     ...this.quickSettingForm
+                }, {
+                    remote: this.canManageSystemSetting
                 })
-                this.$message.success(this.t('setting.saved'))
+                this.$message.success(this.canManageSystemSetting ? this.t('setting.saved') : '界面设置已保存到当前账号本地')
                 this.quickSettingVisible = false
             } catch (error) {
                 console.error('Save quick settings failed:', error)
@@ -1107,8 +1117,12 @@ export default {
     border: none;
     border-radius: 20px;
     padding: 0;
-    overflow: hidden;
+    overflow: visible;
     box-shadow: 0 18px 36px rgba(32, 45, 85, 0.18);
+}
+
+:deep(.quick-setting-color-popper.el-popper) {
+    z-index: 3000;
 }
 
 .quick-setting-panel {

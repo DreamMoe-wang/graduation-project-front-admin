@@ -7,6 +7,10 @@ function normalizeTradeQuery(params = {}) {
     normalized.pageNum = normalized.currentPage
   }
 
+  if (Array.isArray(normalized.categoryNames)) {
+    normalized.categoryNames = normalized.categoryNames.filter(Boolean)
+  }
+
   if (Array.isArray(normalized.dateRange)) {
     const [startDate, endDate] = normalized.dateRange
     normalized.startDate = startDate

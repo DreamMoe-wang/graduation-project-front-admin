@@ -1,11 +1,10 @@
 import { defineStore } from 'pinia'
-import { deleteTradePublish } from '@/api/tradePublish'
 import {
-  exportTradeList,
-  getTradeListDetail,
-  getTradeListPage,
-  receiveTradeList
-} from '@/api/tradeList'
+  approveQualification,
+  getQualificationDetail,
+  getQualificationPage,
+  rejectQualification
+} from '@/api/qualification'
 import {
   applyPageResult,
   createPaginationState,
@@ -16,16 +15,8 @@ import {
 
 function createDefaultSearchForm() {
   return {
-    title: '',
-    tradeStatus: 'published',
-    minAmount: '',
-    maxAmount: '',
-    dateRange: [],
-    categoryNames: [],
-    userCityName: '',
-    userAreaName: '',
-    userLongitude: null,
-    userLatitude: null
+    realName: '',
+    status: ''
   }
 }
 
@@ -33,23 +24,25 @@ function createDefaultPagination() {
   return createPaginationState()
 }
 
-export const useTradeListStore = defineStore('tradeList', {
+export const useQualificationStore = defineStore('qualification', {
   state: () => ({
     searchForm: createDefaultSearchForm(),
     tableData: [],
     loading: false,
     pagination: createDefaultPagination(),
     detailVisible: false,
-    currentRow: null
+    currentRow: null,
+    selectedRows: [],
+    auditLoading: false,
+    auditAction: ''
   }),
   actions: {
     async fetchData() {
       this.loading = true
 
       try {
-        const pageData = await getTradeListPage({
+        const pageData = await getQualificationPage({
           ...this.searchForm,
-          status: this.searchForm.tradeStatus || 'published',
           pageNum: this.pagination.currentPage,
           pageSize: this.pagination.pageSize
         })
@@ -73,28 +66,38 @@ export const useTradeListStore = defineStore('tradeList', {
       await this.fetchData()
     },
     async openDetail(id) {
-      this.currentRow = await getTradeListDetail(id)
+      this.currentRow = await getQualificationDetail(id)
       this.detailVisible = true
     },
     closeDetail() {
       this.detailVisible = false
       this.currentRow = null
     },
-    async deleteById(id) {
-      await deleteTradePublish(id)
+    setSelectedRows(rows) {
+      this.selectedRows = Array.isArray(rows) ? rows : []
+    },
+    clearSelectedRows() {
+      this.selectedRows = []
+    },
+    isAuditable(row) {
+      return row?.status === 'auditing'
+    },
+    async auditRows(ids, action, reviewRemark = '') {
+      const requestFn = action === 'approve' ? approveQualification : rejectQualification
+      this.auditLoading = true
+      this.auditAction = action
 
-      if (this.tableData.length === 1 && this.pagination.currentPage > 1) {
-        this.pagination.currentPage -= 1
+      try {
+        for (const id of ids) {
+          await requestFn(id, reviewRemark ? { reviewRemark } : {})
+        }
+
+        this.clearSelectedRows()
+        await this.fetchData()
+      } finally {
+        this.auditLoading = false
+        this.auditAction = ''
       }
-
-      await this.fetchData()
-    },
-    async exportData() {
-      return exportTradeList(this.searchForm)
-    },
-    async receiveById(id) {
-      await receiveTradeList(id)
-      await this.fetchData()
     },
     async setPageSize(pageSize) {
       updatePageSize(this, pageSize)
@@ -107,6 +110,9 @@ export const useTradeListStore = defineStore('tradeList', {
     resetTransientState() {
       this.detailVisible = false
       this.currentRow = null
+      this.clearSelectedRows()
+      this.auditLoading = false
+      this.auditAction = ''
     }
   }
 })

@@ -203,6 +203,8 @@ function createDefaultProfile() {
     cityName: '',
     areaName: '',
     address: '',
+    longitude: null,
+    latitude: null,
     bio: '',
     walletBalance: 0,
     roleNames: []
@@ -391,6 +393,8 @@ export default {
       this.profile.cityName = location?.cityName || this.profile.cityName
       this.profile.areaName = location?.areaName || this.profile.areaName
       this.profile.address = location?.address || this.profile.address
+      this.profile.longitude = location?.longitude ?? this.profile.longitude
+      this.profile.latitude = location?.latitude ?? this.profile.latitude
 
       const locationLabel = [location?.cityName, location?.areaName].filter(Boolean).join(' ') || '当前位置'
       this.$message.success(byIp ? `已根据本机 IP 定位：${locationLabel}` : `已根据浏览器定位：${locationLabel}`)
@@ -399,6 +403,8 @@ export default {
       this.profile.cityName = location?.cityName || ''
       this.profile.areaName = location?.areaName || ''
       this.profile.address = location?.address || ''
+      this.profile.longitude = location?.longitude ?? null
+      this.profile.latitude = location?.latitude ?? null
       this.$message.success(`已手动确认位置：${location?.address || '当前位置'}`)
     },
     syncAuthUserProfile() {
@@ -436,6 +442,8 @@ export default {
             cityName: this.profile.cityName,
             areaName: this.profile.areaName,
             address: this.profile.address,
+            longitude: this.profile.longitude,
+            latitude: this.profile.latitude,
             bio: this.profile.bio
           })
 

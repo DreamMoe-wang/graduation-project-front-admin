@@ -47,6 +47,17 @@ function createDevMenus() {
       children: []
     },
     {
+      id: 1040,
+      parentId: 0,
+      name: '资格认证',
+      menuType: 2,
+      path: '/qualification',
+      routeName: 'QualificationManage',
+      component: 'qualification/QualificationManage',
+      icon: 'Medal',
+      children: []
+    },
+    {
       id: 1002,
       parentId: 0,
       name: '交易集市',
@@ -148,6 +159,39 @@ function createDevMenus() {
       children: []
     },
     {
+      id: 1010,
+      parentId: 0,
+      name: '通知公告',
+      menuType: 2,
+      path: '/notice',
+      routeName: 'NoticeManage',
+      component: 'notice/NoticeManage',
+      icon: 'Bell',
+      children: []
+    },
+    {
+      id: 1011,
+      parentId: 0,
+      name: '日志管理',
+      menuType: 2,
+      path: '/log',
+      routeName: 'LogManage',
+      component: 'log/LogManage',
+      icon: 'Notebook',
+      children: []
+    },
+    {
+      id: 1012,
+      parentId: 0,
+      name: '系统设置',
+      menuType: 2,
+      path: '/setting',
+      routeName: 'SystemSetting',
+      component: 'setting/SystemSetting',
+      icon: 'Setting',
+      children: []
+    },
+    {
       id: 1030,
       parentId: 0,
       name: '个人中心',
@@ -177,7 +221,14 @@ function createDevBypassUser() {
       'trade:publish:delete',
       'trade:publish:save',
       'trade:publish:submit',
+      'qualification:view',
+      'qualification:create',
+      'qualification:edit',
+      'qualification:save',
+      'qualification:submit',
+      'qualification:review',
       'trade:list:view',
+      'trade:category:manage',
       'trade:list:export',
       'trade:list:edit',
       'trade:list:delete',
@@ -192,10 +243,6 @@ function createDevBypassUser() {
       'trade:review',
       'user:manage',
       'role:manage',
-      'menu:view',
-      'menu:create',
-      'menu:edit',
-      'menu:delete',
       'notice:manage',
       'log:manage',
       'setting:manage'
@@ -212,6 +259,8 @@ function normalizeAuthUser(payload = {}) {
     nickname: payload.nickname || payload.displayName || payload.username || '',
     displayName: payload.displayName || payload.nickname || payload.username || '管理员',
     avatar: payload.avatar || '',
+    phone: payload.phone || '',
+    email: payload.email || '',
     roles: Array.isArray(payload.roles) ? payload.roles : [],
     roleNames: Array.isArray(payload.roleNames) ? payload.roleNames : [],
     authorities: Array.isArray(payload.authorities) ? payload.authorities : [],

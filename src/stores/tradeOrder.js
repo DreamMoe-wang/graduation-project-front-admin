@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import {
   cancelTradeOrder,
   completeTradeOrder,
+  confirmTradeOrder,
   getTradeOrderDetail,
   getTradeOrderPage,
   getTradeOrderStats,
@@ -85,6 +86,9 @@ export const useTradeOrderStore = defineStore('tradeOrder', {
     },
     async complete(id) {
       await this.performOrderAction(id, 'complete', completeTradeOrder)
+    },
+    async confirm(id) {
+      await this.performOrderAction(id, 'confirm', confirmTradeOrder)
     },
     async pay(id) {
       await this.performOrderAction(id, 'pay', payTradeOrder)

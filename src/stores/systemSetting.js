@@ -58,6 +58,7 @@ const TEXT_MAP = {
   'tags.tradePublishCreate': '创建交易',
   'tags.tradePublishEdit': '编辑交易',
   'tags.tradeList': '交易大全',
+  'tags.tradeCategory': '交易标签管理',
   'tags.tradeOrder': '我的订单',
   'tags.tradeOrderPublish': '发布订单',
   'tags.tradeOrderReceive': '接取订单',
@@ -65,27 +66,27 @@ const TEXT_MAP = {
   'tags.profile': '个人中心',
   'tags.user': '用户管理',
   'tags.role': '角色管理',
-  'tags.menu': '菜单管理',
   'tags.notice': '通知公告',
   'tags.log': '日志管理',
   'tags.setting': '系统设置',
   'menu.home': '首页',
+  'menu.qualification': '资格认证',
   'menu.trade': '交易集市',
   'menu.tradePublish': '交易发布',
   'menu.tradeList': '交易大全',
+  'menu.tradeCategory': '交易标签管理',
   'menu.tradeOrder': '我的订单',
   'menu.tradeOrderPublish': '发布订单',
   'menu.tradeOrderReceive': '接取订单',
   'menu.chat': '聊天室',
   'menu.user': '用户管理',
   'menu.role': '角色管理',
-  'menu.menu': '菜单管理',
   'menu.notice': '通知公告',
   'menu.log': '日志管理',
   'menu.setting': '系统设置',
   'menu.profile': '个人中心',
   'setting.title': '系统设置',
-  'setting.subtitle': '统一配置主题颜色、明暗模式和字体大小，并在保存后同步到后台。',
+  'setting.subtitle': '统一配置主题颜色、明暗模式和字体大小，并在保存后同步到后端。',
   'setting.section.base': '基础信息',
   'setting.section.appearance': '界面外观',
   'setting.section.preview': '实时预览',
@@ -110,18 +111,19 @@ const TEXT_MAP = {
 
 const PATH_TRANSLATIONS = {
   '/': 'menu.home',
+  '/qualification': 'menu.qualification',
   '/trade': 'menu.trade',
   '/trade/publish': 'menu.tradePublish',
   '/trade/publish/create': 'tags.tradePublishCreate',
   '/trade/publish/edit': 'tags.tradePublishEdit',
   '/trade/list': 'menu.tradeList',
+  '/trade/category': 'menu.tradeCategory',
   '/trade/order': 'menu.tradeOrder',
   '/trade/order/publish': 'menu.tradeOrderPublish',
   '/trade/order/receive': 'menu.tradeOrderReceive',
   '/chat': 'menu.chat',
   '/user': 'menu.user',
   '/role': 'menu.user',
-  '/menu': 'menu.menu',
   '/notice': 'menu.notice',
   '/log': 'menu.log',
   '/setting': 'menu.setting',
@@ -132,7 +134,6 @@ function safeLocalStorage() {
   if (typeof window === 'undefined') {
     return null
   }
-
   return window.localStorage
 }
 
@@ -276,15 +277,25 @@ export const useSystemSettingStore = defineStore('systemSetting', {
       this.applySettings(this.settings)
       return this.settings
     },
+    saveSettingsToLocal(nextSettings) {
+      const normalized = normalizeSettings(nextSettings)
+      this.settings = normalized
+      writeStoredSettings(this.settings)
+      this.applySettings(this.settings)
+      return this.settings
+    },
     previewSettings(nextSettings) {
       this.applySettings(normalizeSettings({
         ...this.settings,
         ...nextSettings
       }))
     },
-    async saveSettings(nextSettings) {
+    async saveSettings(nextSettings, options = {}) {
+      const { remote = true } = options
       const normalized = normalizeSettings(nextSettings)
-      await updateSettingDetail(normalized)
+      if (remote) {
+        await updateSettingDetail(normalized)
+      }
       this.settings = normalized
       writeStoredSettings(this.settings)
       this.applySettings(this.settings)

@@ -4,9 +4,7 @@
       <div class="page-header">
         <div>
           <h2 class="page-title">{{ isEdit ? '编辑交易' : '创建交易' }}</h2>
-          <p class="page-subtitle">
-            保存会写入草稿状态，确认会提交为待审核状态。
-          </p>
+          <p class="page-subtitle">保存会写入草稿状态，确认会提交为待审核状态。</p>
         </div>
         <div class="status-hint">
           <span class="hint-label">状态规则</span>
@@ -43,17 +41,10 @@
               placeholder="请输入位置，或点击右侧按钮定位 / 地图选点"
               @input="handleLocationInput"
             />
-            <el-button
-              type="primary"
-              plain
-              :loading="locating"
-              @click="handleLocate"
-            >
+            <el-button type="primary" plain :loading="locating" @click="handleLocate">
               {{ locating ? '定位中...' : '定位' }}
             </el-button>
-            <el-button plain @click="locationPickerVisible = true">
-              地图选点
-            </el-button>
+            <el-button plain @click="locationPickerVisible = true">地图选点</el-button>
           </div>
         </el-form-item>
 
@@ -65,6 +56,28 @@
             controls-position="right"
             style="width: 100%"
           />
+        </el-form-item>
+
+        <el-form-item label="交易类型" prop="categoryNames">
+          <el-select
+            v-model="formData.categoryNames"
+            multiple
+            filterable
+            allow-create
+            default-first-option
+            reserve-keyword
+            clearable
+            placeholder="请选择或输入交易类型"
+            style="width: 100%"
+            @change="handleTradeCategoryChange"
+          >
+            <el-option
+              v-for="item in tradeCategoryOptions"
+              :key="item"
+              :label="item.categoryName"
+              :value="item.categoryName"
+            />
+          </el-select>
         </el-form-item>
 
         <el-form-item label="图片信息">
@@ -137,6 +150,7 @@ import { ElMessage } from 'element-plus'
 import BaiduLocationPicker from '@/components/BaiduLocationPicker.vue'
 import { locateByIp, reverseGeocodeLocation } from '@/api/location'
 import { uploadOssFile } from '@/api/oss'
+import { getTradeCategoryList } from '@/api/tradeCategory'
 import { useAuthStore } from '@/stores/auth'
 import { useTradePublishEditorStore } from '@/stores/tradePublishEditor'
 import { emitCloseTag } from '@/utils/tags'
@@ -161,6 +175,18 @@ const formRules = {
   ],
   location: [
     { max: 255, message: '位置长度不能超过 255 个字符', trigger: 'blur' }
+  ],
+  categoryNames: [
+    {
+      validator: (_, value, callback) => {
+        if (Array.isArray(value) && value.length) {
+          callback()
+          return
+        }
+        callback(new Error('请选择或录入至少一个交易类型'))
+      },
+      trigger: 'change'
+    }
   ]
 }
 
@@ -181,12 +207,28 @@ export default {
     const previewVisible = ref(false)
     const previewImageUrl = ref('')
     const locationPickerVisible = ref(false)
+    const tradeCategoryOptions = ref([])
+    const qualificationCategoryNames = computed(() => tradeCategoryOptions.value.filter(item => item?.requiresQualification).map(item => item.categoryName))
     const { loading, submitLoading, isEdit, formData } = storeToRefs(store)
 
     const uploadFileList = computed(() => (formData.value.imageUrls || []).map((url, index) => ({
       name: `trade-image-${index + 1}`,
       url
     })))
+
+    const loadTradeCategoryOptions = async () => {
+      try {
+        const list = await getTradeCategoryList()
+        tradeCategoryOptions.value = Array.isArray(list) ? list.filter(item => item?.categoryName) : []
+      } catch (error) {
+        tradeCategoryOptions.value = []
+        console.error('Load trade category options failed:', error)
+      }
+    }
+
+    const handleTradeCategoryChange = values => {
+      formData.value.categoryNames = Array.isArray(values) ? values.filter(Boolean) : []
+    }
 
     const loadPage = async () => {
       const id = route.params.id
@@ -200,7 +242,7 @@ export default {
           formData.value.clientPhone = authStore.currentUser?.phone || ''
         }
       } catch (error) {
-        console.error('初始化交易表单失败:', error)
+        console.error('Init trade form failed:', error)
       }
     }
 
@@ -221,7 +263,7 @@ export default {
           ElMessage.success(status === 'draft' ? '已保存为草稿' : '已提交为待审核')
           await closeCurrentTagAndBack()
         } catch (error) {
-          console.error('提交交易失败:', error)
+          console.error('Submit trade failed:', error)
         } finally {
           pendingAction.value = ''
         }
@@ -274,6 +316,8 @@ export default {
       formData.value.cityName = location?.cityName || formData.value.cityName || ''
       formData.value.areaName = location?.areaName || formData.value.areaName || ''
       formData.value.location = location?.address || formData.value.location || ''
+      formData.value.longitude = location?.longitude ?? formData.value.longitude ?? null
+      formData.value.latitude = location?.latitude ?? formData.value.latitude ?? null
 
       const locationLabel = formData.value.location
         || [location?.cityName, location?.areaName].filter(Boolean).join(' ')
@@ -313,6 +357,8 @@ export default {
     const handleLocationInput = () => {
       formData.value.cityName = ''
       formData.value.areaName = ''
+      formData.value.longitude = null
+      formData.value.latitude = null
     }
 
     const beforeImageUpload = file => {
@@ -356,11 +402,13 @@ export default {
       formData.value.cityName = location?.cityName || ''
       formData.value.areaName = location?.areaName || ''
       formData.value.location = location?.address || ''
+      formData.value.longitude = location?.longitude ?? null
+      formData.value.latitude = location?.latitude ?? null
       ElMessage.success(`已手动确认位置：${location?.address || '当前位置'}`)
     }
 
     onMounted(async () => {
-      await loadPage()
+      await Promise.all([loadPage(), loadTradeCategoryOptions()])
     })
 
     watch(
@@ -387,6 +435,8 @@ export default {
       previewVisible,
       previewImageUrl,
       locationPickerVisible,
+      tradeCategoryOptions,
+      qualificationCategoryNames,
       handleCancel,
       handleSaveDraft,
       handleSubmitAudit,
@@ -396,7 +446,8 @@ export default {
       handleImageUpload,
       handleRemoveImage,
       handlePreviewImage,
-      handleLocationPicked
+      handleLocationPicked,
+      handleTradeCategoryChange
     }
   }
 }
@@ -474,6 +525,13 @@ export default {
   margin: 8px 0 0;
   color: #6b7280;
   font-size: 13px;
+}
+
+.qualification-hint {
+  margin: -6px 0 18px 100px;
+  color: #9a6b16;
+  font-size: 13px;
+  line-height: 1.6;
 }
 
 .action-bar {

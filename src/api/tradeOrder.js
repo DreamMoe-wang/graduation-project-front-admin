@@ -48,6 +48,13 @@ export function completeTradeOrder(id) {
   })
 }
 
+export function confirmTradeOrder(id) {
+  return request({
+    url: `/trade/order/${id}/confirm`,
+    method: 'post'
+  })
+}
+
 export function payTradeOrder(id) {
   return request({
     url: `/trade/order/${id}/pay`,

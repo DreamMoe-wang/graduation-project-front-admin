@@ -13,6 +13,10 @@
       />
     </div>
 
+    <div v-if="activeOrderRole === 'receiver' && !canTakeOrders" class="qualification-tip">
+      接单前需要先完成并通过“资格认证”。
+    </div>
+
     <el-row :gutter="20" class="stats-row">
       <el-col :xs="12" :sm="8" :md="8" :lg="4" :xl="4">
         <el-card shadow="hover" class="stat-card">
@@ -75,6 +79,10 @@
                   {{ item.area || '暂无区域' }}
                 </span>
                 <span>
+                  <el-icon><CollectionTag /></el-icon>
+                  {{ (item.categoryNames || []).join(' / ') || '暂无类型' }}
+                </span>
+                <span>
                   <el-icon><Clock /></el-icon>
                   {{ item.createTime || '暂无时间' }}
                 </span>
@@ -84,6 +92,8 @@
               <div class="order-price">¥{{ formatPrice(item.price) }}</div>
             </div>
           </div>
+
+          <div v-if="getQualificationWarning(item)" class="qualification-item-tip">{{ getQualificationWarning(item) }}</div>
 
           <div class="order-actions">
             <el-button
@@ -97,16 +107,6 @@
               确认接单
             </el-button>
             <el-button
-              v-if="canPay(item)"
-              v-permission="'trade:order:view'"
-              type="warning"
-              size="small"
-              :loading="isActionLoading(item.id, 'pay')"
-              @click="handlePay(item)"
-            >
-              去支付
-            </el-button>
-            <el-button
               v-if="canComplete(item)"
               v-permission="'trade:order:view'"
               type="success"
@@ -117,18 +117,27 @@
               完成任务
             </el-button>
             <el-button
-              v-if="item.status === 'progress' && canCancel(item)"
+              v-if="canConfirm(item)"
               v-permission="'trade:order:view'"
-              type="danger"
+              type="primary"
               size="small"
-              plain
-              :loading="isActionLoading(item.id, 'cancel')"
-              @click="handleCancel(item)"
+              :loading="isActionLoading(item.id, 'confirm')"
+              @click="handleConfirm(item)"
             >
-              取消订单
+              确认完成
             </el-button>
             <el-button
-              v-if="item.status === 'pending' && canCancel(item)"
+              v-if="canPay(item)"
+              v-permission="'trade:order:view'"
+              type="warning"
+              size="small"
+              :loading="isActionLoading(item.id, 'pay')"
+              @click="handlePay(item)"
+            >
+              去支付
+            </el-button>
+            <el-button
+              v-if="canCancel(item)"
               v-permission="'trade:order:view'"
               type="danger"
               size="small"
@@ -136,7 +145,7 @@
               :loading="isActionLoading(item.id, 'cancel')"
               @click="handleCancel(item)"
             >
-              退单
+              {{ item.status === 'pending' ? '退单' : '取消订单' }}
             </el-button>
             <el-button size="small" plain @click="handleViewDetail(item)">查看详情</el-button>
             <el-button
@@ -170,8 +179,11 @@
       <el-descriptions v-if="currentOrder" :column="1" border>
         <el-descriptions-item label="订单号">{{ currentOrder.orderNo }}</el-descriptions-item>
         <el-descriptions-item label="任务标题">{{ currentOrder.title }}</el-descriptions-item>
-        <el-descriptions-item label="所在区域">{{ currentOrder.area }}</el-descriptions-item>
-        <el-descriptions-item label="创建时间">{{ currentOrder.createTime }}</el-descriptions-item>
+        <el-descriptions-item label="所在区域">{{ currentOrder.area || '-' }}</el-descriptions-item>
+        <el-descriptions-item label="交易类型">
+          {{ (currentOrder.categoryNames || []).join(' / ') || '无' }}
+        </el-descriptions-item>
+        <el-descriptions-item label="创建时间">{{ currentOrder.createTime || '-' }}</el-descriptions-item>
         <el-descriptions-item label="接单人">
           {{
             currentOrder.receiver?.displayName
@@ -217,7 +229,7 @@
 </template>
 
 <script>
-import { Clock, Location } from '@element-plus/icons-vue'
+import { Clock, CollectionTag, Location } from '@element-plus/icons-vue'
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useRoute, useRouter } from 'vue-router'
@@ -226,6 +238,8 @@ import { getOrderStatusText, getOrderStatusType } from '@/config/statusConfig'
 import { formatCurrency } from '@/utils/format'
 import { useAuthStore } from '@/stores/auth'
 import { useTradeOrderStore } from '@/stores/tradeOrder'
+import { fetchCurrentQualificationSafe, resolveQualificationRedirectPath } from '@/utils/qualification'
+import { getTradeCategoryList } from '@/api/tradeCategory'
 
 const ROLE_ROUTE_MAP = {
   publisher: '/trade/order/publish',
@@ -240,6 +254,7 @@ export default {
   name: 'TradeOrder',
   components: {
     Clock,
+    CollectionTag,
     Location
   },
   setup() {
@@ -250,6 +265,10 @@ export default {
     const { loading, orderList, pagination, detailVisible, currentOrder } = storeToRefs(store)
     const { currentUser } = storeToRefs(authStore)
     const activeOrderRole = ref(resolveOrderRoleByPath(route.path))
+    const qualificationChecked = ref(false)
+    const qualificationApproved = ref(false)
+    const qualificationRecord = ref(null)
+    const tradeCategoryOptions = ref([])
 
     const roleOptions = [
       { label: '发布订单', value: 'publisher' },
@@ -257,38 +276,38 @@ export default {
     ]
 
     const normalizeUserId = value => {
-      if (value == null || value === '') {
-        return null
-      }
-
+      if (value == null || value === '') return null
       const id = Number(value)
       return Number.isNaN(id) ? null : id
     }
 
     const currentUserId = computed(() => normalizeUserId(currentUser.value?.userId ?? currentUser.value?.id))
+    const canTakeOrders = computed(() => authStore.hasPermission('qualification:review') || qualificationApproved.value)
+    const approvedQualificationTypes = computed(() => Array.isArray(qualificationRecord.value?.approvedQualificationTypes) ? qualificationRecord.value.approvedQualificationTypes : [])
+    const tradeCategoryRequirementMap = computed(() => tradeCategoryOptions.value.reduce((acc, item) => {
+      if (item?.categoryName) {
+        acc[item.categoryName] = !!item.requiresQualification
+      }
+      return acc
+    }, {}))
     const pageTitle = computed(() => (activeOrderRole.value === 'publisher' ? '发布订单' : '接取订单'))
     const pageSubtitle = computed(() => (activeOrderRole.value === 'publisher'
-      ? '查看自己发布的全部订单及支付进度'
-      : '查看自己接取的订单并处理履约状态'))
+      ? '查看自己发布的全部订单、确认验收并完成支付。'
+      : '查看自己接取的订单，并推进接单与履约流程。'))
 
     const extractOrderId = item => normalizeUserId(item?.id ?? item?.orderId)
     const extractOrderUserId = profile => normalizeUserId(profile?.userId ?? profile?.id)
     const extractOrderTradeId = item => normalizeUserId(item?.postId ?? item?.tradeId)
 
     const visibleOrderList = computed(() => {
-      if (!currentUserId.value) {
-        return orderList.value
-      }
+      if (!currentUserId.value) return orderList.value
 
       return orderList.value.filter(item => {
         const publisherId = extractOrderUserId(item?.publisher)
         const receiverId = extractOrderUserId(item?.receiver)
-
-        if (activeOrderRole.value === 'publisher') {
-          return publisherId === currentUserId.value
-        }
-
-        return receiverId === currentUserId.value
+        return activeOrderRole.value === 'publisher'
+          ? publisherId === currentUserId.value
+          : receiverId === currentUserId.value
       })
     })
 
@@ -302,7 +321,7 @@ export default {
 
       if (displayStatus === 'pending') {
         stats.pendingCount += 1
-      } else if (displayStatus === 'progress') {
+      } else if (displayStatus === 'progress' || displayStatus === 'confirm_pending') {
         stats.progressCount += 1
       } else if (displayStatus === 'pay_pending') {
         stats.payPendingCount += 1
@@ -319,41 +338,72 @@ export default {
       successCount: 0
     }))
 
-    const canReceive = item => item?.status === 'pending' && activeOrderRole.value === 'receiver'
-    const isReceiver = item => currentUserId.value && extractOrderUserId(item?.receiver) === currentUserId.value
-
-    const canComplete = item => {
-      if (item?.status !== 'progress' || !currentUserId.value) {
-        return false
+    const loadTradeCategoryOptions = async () => {
+      try {
+        const list = await getTradeCategoryList()
+        tradeCategoryOptions.value = Array.isArray(list) ? list.filter(item => item?.categoryName) : []
+      } catch (error) {
+        tradeCategoryOptions.value = []
+        console.error('Load trade categories failed:', error)
       }
-
-      return isReceiver(item)
     }
 
+    const refreshQualificationStatus = async () => {
+      if (authStore.hasPermission('qualification:review')) {
+        qualificationChecked.value = true
+        qualificationApproved.value = true
+        qualificationRecord.value = null
+        return
+      }
+
+      const result = await fetchCurrentQualificationSafe()
+      qualificationChecked.value = true
+      qualificationApproved.value = !!result.approved
+      qualificationRecord.value = result.record || null
+    }
+
+    const ensureQualificationApproved = async () => {
+      if (!qualificationChecked.value) {
+        await refreshQualificationStatus()
+      }
+
+      if (canTakeOrders.value) return true
+
+      ElMessage.warning('请先完成并通过资格认证后再接单')
+      router.push(resolveQualificationRedirectPath(qualificationRecord.value))
+      return false
+    }
+
+    const isReceiver = item => currentUserId.value && extractOrderUserId(item?.receiver) === currentUserId.value
+    const isPublisher = item => currentUserId.value && extractOrderUserId(item?.publisher) === currentUserId.value
+
+    const getRequiredQualificationTypes = item => (item?.categoryNames || []).filter(name => tradeCategoryRequirementMap.value[name])
+
+    const canReceive = item => {
+      if (!(item?.status === 'pending' && activeOrderRole.value === 'receiver')) return false
+      const requiredTypes = getRequiredQualificationTypes(item)
+      if (!requiredTypes.length) return true
+      if (authStore.hasPermission('qualification:review')) return true
+      return requiredTypes.some(type => approvedQualificationTypes.value.includes(type))
+    }
+
+    const getQualificationWarning = item => {
+      const requiredTypes = getRequiredQualificationTypes(item)
+      if (!requiredTypes.length || canReceive(item)) return ''
+      return `????????????????${requiredTypes.join(' / ')}`
+    }
+    const canComplete = item => item?.status === 'progress' && isReceiver(item)
+    const canConfirm = item => item?.status === 'confirm_pending' && isPublisher(item)
+
     const canCancel = item => {
-      if (!currentUserId.value) {
-        return false
-      }
-
-      const canCancelStatus = item?.status === 'pending' || item?.status === 'progress'
-      if (!canCancelStatus) {
-        return false
-      }
-
-      return isReceiver(item)
+      if (!currentUserId.value) return false
+      const canCancelStatus = item?.status === 'pending' || item?.status === 'progress' || item?.status === 'confirm_pending'
+      return canCancelStatus && isReceiver(item)
     }
 
     const canPay = item => {
-      if (!currentUserId.value) {
-        return false
-      }
-
-      const isPublisher = extractOrderUserId(item?.publisher) === currentUserId.value
-      if (!isPublisher) {
-        return false
-      }
-
-      return getDisplayOrderStatus(item) === 'pay_pending'
+      if (!currentUserId.value) return false
+      return isPublisher(item) && getDisplayOrderStatus(item) === 'pay_pending'
     }
 
     const syncRoleByRoute = path => {
@@ -369,7 +419,7 @@ export default {
       try {
         await store.setCurrentPage(1)
       } catch (error) {
-        console.error('切换订单菜单失败:', error)
+        console.error('Switch order role failed:', error)
       }
     }
 
@@ -377,25 +427,42 @@ export default {
       try {
         await store.openDetail(item.id)
       } catch (error) {
-        console.error('获取订单详情失败:', error)
+        console.error('Open order detail failed:', error)
       }
     }
 
     const handleReceive = async item => {
       try {
+        const allowed = await ensureQualificationApproved()
+        if (!allowed) return
+
+        if (!canReceive(item)) {
+          ElMessage.warning(getQualificationWarning(item) || '??????????')
+          return
+        }
+
         await store.receive(item.id)
         ElMessage.success('接单成功')
       } catch (error) {
-        console.error('接单失败:', error)
+        console.error('Receive order failed:', error)
       }
     }
 
     const handleComplete = async item => {
       try {
         await store.complete(item.id)
-        ElMessage.success('任务已完成，等待发布方支付')
+        ElMessage.success('已提交完成，等待委托方确认')
       } catch (error) {
-        console.error('完成订单失败:', error)
+        console.error('Complete order failed:', error)
+      }
+    }
+
+    const handleConfirm = async item => {
+      try {
+        await store.confirm(item.id)
+        ElMessage.success('委托方已确认完成，可进入支付')
+      } catch (error) {
+        console.error('Confirm order failed:', error)
       }
     }
 
@@ -404,7 +471,7 @@ export default {
         await store.pay(item.id)
         ElMessage.success('支付成功')
       } catch (error) {
-        console.error('订单支付失败:', error)
+        console.error('Pay order failed:', error)
       }
     }
 
@@ -422,7 +489,7 @@ export default {
         ElMessage.success(`${actionText}成功`)
       } catch (error) {
         if (error !== 'cancel' && error !== 'close') {
-          console.error(`${actionText}失败:`, error)
+          console.error(`${actionText} failed:`, error)
         }
       }
     }
@@ -449,7 +516,7 @@ export default {
       try {
         await store.setPageSize(val)
       } catch (error) {
-        console.error('切换订单分页大小失败:', error)
+        console.error('Change order page size failed:', error)
       }
     }
 
@@ -457,20 +524,17 @@ export default {
       try {
         await store.setCurrentPage(val)
       } catch (error) {
-        console.error('切换订单页码失败:', error)
+        console.error('Change order page failed:', error)
       }
     }
 
     const formatPrice = price => formatCurrency(price, { withSymbol: false })
-    const getDisplayOrderStatus = item => {
-      if (!item) {
-        return ''
-      }
 
+    const getDisplayOrderStatus = item => {
+      if (!item) return ''
       if (item.status === 'success' && (item.payStatus || 'unpaid') === 'unpaid') {
         return 'pay_pending'
       }
-
       return item.status
     }
 
@@ -489,9 +553,13 @@ export default {
       syncRoleByRoute(route.path)
 
       try {
-        await store.fetchData()
+        await Promise.all([
+          store.fetchData(),
+          refreshQualificationStatus(),
+          loadTradeCategoryOptions()
+        ])
       } catch (error) {
-        console.error('获取订单数据失败:', error)
+        console.error('Load order data failed:', error)
       }
     })
 
@@ -503,6 +571,7 @@ export default {
       loading,
       roleOptions,
       activeOrderRole,
+      canTakeOrders,
       pageTitle,
       pageSubtitle,
       visibleOrderList,
@@ -512,14 +581,17 @@ export default {
       detailVisible,
       currentOrder,
       canReceive,
-      canPay,
+      getQualificationWarning,
       canComplete,
+      canConfirm,
+      canPay,
       canCancel,
       handleRoleChange,
       handleViewDetail,
       handleReceive,
-      handlePay,
       handleComplete,
+      handleConfirm,
+      handlePay,
       handleCancel,
       handleContact,
       handleSizeChange,
@@ -564,6 +636,22 @@ export default {
   flex-shrink: 0;
 }
 
+.qualification-tip {
+  margin-bottom: 18px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: rgba(245, 158, 11, 0.08);
+  color: #9a6b16;
+  font-size: 14px;
+}
+
+.qualification-item-tip {
+  margin-bottom: 12px;
+  color: #9a6b16;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
 .stats-row {
   margin-bottom: 20px;
 }
@@ -584,7 +672,7 @@ export default {
 
 .stat-value {
   font-size: 32px;
-  font-weight: bold;
+  font-weight: 700;
   color: #333;
 }
 
@@ -657,7 +745,7 @@ export default {
 .order-price {
   font-size: 24px;
   color: #f56c6c;
-  font-weight: bold;
+  font-weight: 700;
   white-space: nowrap;
 }
 
@@ -678,7 +766,7 @@ export default {
 
 .price-text {
   color: #f56c6c;
-  font-weight: bold;
+  font-weight: 700;
 }
 
 .detail-image-list {
