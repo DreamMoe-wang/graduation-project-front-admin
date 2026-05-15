@@ -7,7 +7,7 @@
             v-model="searchForm.title"
             placeholder="请输入交易标题"
             clearable
-            style="width: 200px"
+            style="width: 220px"
           />
         </el-form-item>
         <el-form-item label="交易类型">
@@ -19,7 +19,7 @@
             clearable
             filterable
             placeholder="请选择交易类型"
-            style="width: 260px"
+            style="width: 280px"
           >
             <el-option
               v-for="item in tradeCategoryOptions"
@@ -29,12 +29,12 @@
             />
           </el-select>
         </el-form-item>
-        <el-form-item label="交易状态">
+        <el-form-item label="发布状态">
           <el-select
             v-model="searchForm.status"
-            placeholder="请选择状态"
+            placeholder="请选择发布状态"
             clearable
-            style="width: 150px"
+            style="width: 160px"
           >
             <el-option
               v-for="item in statusOptions"
@@ -59,9 +59,7 @@
 
     <el-card class="table-card">
       <div class="table-header">
-        <div class="header-left">
-          <span class="page-title">交易管理</span>
-        </div>
+        <span class="page-title">交易管理</span>
       </div>
 
       <div class="action-toolbar">
@@ -110,15 +108,10 @@
           width="54"
           :selectable="isRowSelectable"
         />
-        <el-table-column prop="title" label="标题" min-width="180" show-overflow-tooltip />
-        <el-table-column prop="clientName" label="委托人" width="100" />
+        <el-table-column prop="title" label="标题" min-width="160" show-overflow-tooltip />
         <el-table-column prop="clientPhone" label="委托人电话" width="130" />
-        <el-table-column prop="location" label="位置" min-width="180" show-overflow-tooltip>
-          <template #default="{ row }">
-            <span>{{ row.location || '-' }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column prop="categoryNames" label="交易类型" min-width="180" show-overflow-tooltip>
+        <el-table-column prop="location" label="位置" min-width="180" show-overflow-tooltip />
+        <el-table-column label="交易类型" min-width="160" show-overflow-tooltip>
           <template #default="{ row }">
             <span>{{ (row.categoryNames || []).join(' / ') || '-' }}</span>
           </template>
@@ -133,19 +126,26 @@
             <span>{{ row.workerPhone || '-' }}</span>
           </template>
         </el-table-column>
-        <el-table-column prop="amount" label="交易金额" width="100" align="center">
+        <el-table-column label="交易金额" width="110" align="center">
           <template #default="{ row }">
             <span class="amount-text">{{ formatAmount(row.amount) }}</span>
           </template>
         </el-table-column>
-        <el-table-column prop="status" label="交易状态" width="100" align="center">
+        <el-table-column label="发布状态" width="110" align="center">
           <template #default="{ row }">
-            <el-tag :type="getStatusType(row.status)" size="small">
-              {{ getStatusText(row.status) }}
+            <el-tag :type="getTradeStatusType(row.status)" size="small">
+              {{ row.statusText || getTradeStatusText(row.status) }}
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="150" fixed="right" align="center">
+        <el-table-column label="流程状态" width="130" align="center">
+          <template #default="{ row }">
+            <el-tag :type="getOrderStatusType(resolveFlowStatus(row))" size="small">
+              {{ resolveFlowStatusText(row) }}
+            </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="操作" width="170" fixed="right" align="center">
           <template #default="{ row }">
             <el-button link type="primary" size="small" @click="handleViewDetail(row)">
               详情
@@ -170,10 +170,22 @@
             >
               驳回
             </el-button>
-            <el-button v-permission="'trade:publish:view'" link type="warning" size="small" @click="handleEdit(row)">
+            <el-button
+              v-permission="'trade:publish:view'"
+              link
+              type="warning"
+              size="small"
+              @click="handleEdit(row)"
+            >
               编辑
             </el-button>
-            <el-button v-permission="'trade:publish:view'" link type="danger" size="small" @click="handleDelete(row)">
+            <el-button
+              v-permission="'trade:publish:view'"
+              link
+              type="danger"
+              size="small"
+              @click="handleDelete(row)"
+            >
               删除
             </el-button>
           </template>
@@ -193,35 +205,36 @@
       </div>
     </el-card>
 
-    <el-dialog v-model="detailVisible" title="交易详情" width="600px" @close="handleDetailClose">
-      <el-descriptions :column="1" border v-if="currentRow">
-        <el-descriptions-item label="交易标题">{{ currentRow.title }}</el-descriptions-item>
-        <el-descriptions-item label="委托人">{{ currentRow.clientName }}</el-descriptions-item>
-        <el-descriptions-item label="委托人电话">{{ currentRow.clientPhone }}</el-descriptions-item>
-        <el-descriptions-item label="接单人">
-          {{ currentRow.workerName || '暂无' }}
-        </el-descriptions-item>
-        <el-descriptions-item label="接单人电话">
-          {{ currentRow.workerPhone || '暂无' }}
-        </el-descriptions-item>
-        <el-descriptions-item label="位置" :span="2">
-          {{ currentRow.location || '未填写' }}
-        </el-descriptions-item>
-        <el-descriptions-item label="交易类型" :span="2">
-          {{ (currentRow.categoryNames || []).join(' / ') || '无' }}
+    <el-dialog v-model="detailVisible" title="交易详情" width="680px" @close="handleDetailClose">
+      <el-descriptions v-if="currentRow" :column="1" border>
+        <el-descriptions-item label="发布单号">{{ currentRow.postNo || '-' }}</el-descriptions-item>
+        <el-descriptions-item label="关联订单号">{{ currentRow.orderNo || '-' }}</el-descriptions-item>
+        <el-descriptions-item label="交易标题">{{ currentRow.title || '-' }}</el-descriptions-item>
+        <el-descriptions-item label="委托人">{{ currentRow.clientName || '-' }}</el-descriptions-item>
+        <el-descriptions-item label="委托人电话">{{ currentRow.clientPhone || '-' }}</el-descriptions-item>
+        <el-descriptions-item label="接单人">{{ currentRow.workerName || '-' }}</el-descriptions-item>
+        <el-descriptions-item label="接单人电话">{{ currentRow.workerPhone || '-' }}</el-descriptions-item>
+        <el-descriptions-item label="位置">{{ currentRow.location || '-' }}</el-descriptions-item>
+        <el-descriptions-item label="交易类型">
+          {{ (currentRow.categoryNames || []).join(' / ') || '-' }}
         </el-descriptions-item>
         <el-descriptions-item label="交易金额">
           <span class="amount-red">{{ formatAmount(currentRow.amount) }}</span>
         </el-descriptions-item>
-        <el-descriptions-item label="交易状态">
-          <el-tag :type="getStatusType(currentRow.status)" size="small">
-            {{ getStatusText(currentRow.status) }}
+        <el-descriptions-item label="发布状态">
+          <el-tag :type="getTradeStatusType(currentRow.status)" size="small">
+            {{ currentRow.statusText || getTradeStatusText(currentRow.status) }}
+          </el-tag>
+        </el-descriptions-item>
+        <el-descriptions-item label="流程状态">
+          <el-tag :type="getOrderStatusType(resolveFlowStatus(currentRow))" size="small">
+            {{ resolveFlowStatusText(currentRow) }}
           </el-tag>
         </el-descriptions-item>
         <el-descriptions-item label="发布时间">
-          {{ currentRow.createTime || '2024-01-01 12:00:00' }}
+          {{ currentRow.createTime || '-' }}
         </el-descriptions-item>
-        <el-descriptions-item label="图片信息" :span="2">
+        <el-descriptions-item label="图片信息">
           <div v-if="currentRow.imageUrls?.length" class="detail-image-list">
             <el-image
               v-for="(url, index) in currentRow.imageUrls"
@@ -233,10 +246,10 @@
               class="detail-image"
             />
           </div>
-          <span v-else>无</span>
+          <span v-else>-</span>
         </el-descriptions-item>
-        <el-descriptions-item label="备注说明" :span="2">
-          {{ currentRow.description || '无' }}
+        <el-descriptions-item label="备注说明">
+          {{ currentRow.description || '-' }}
         </el-descriptions-item>
       </el-descriptions>
     </el-dialog>
@@ -250,6 +263,8 @@ import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Search, Refresh, Plus } from '@element-plus/icons-vue'
 import {
+  getOrderStatusText,
+  getOrderStatusType,
   getTradeStatusText,
   getTradeStatusType,
   TRADE_STATUS_OPTIONS
@@ -290,6 +305,16 @@ export default {
       ...TRADE_STATUS_OPTIONS
     ]))
 
+    const resolveFlowStatus = row => {
+      const raw = row?.flowStatus || row?.orderStatus || row?.status || ''
+      return raw
+    }
+
+    const resolveFlowStatusText = row => {
+      if (row?.flowStatusText) return row.flowStatusText
+      return getOrderStatusText(resolveFlowStatus(row))
+    }
+
     const loadTradeCategoryOptions = async () => {
       try {
         const list = await getTradeCategoryList()
@@ -301,19 +326,11 @@ export default {
     }
 
     const handleSearch = async () => {
-      try {
-        await store.search()
-      } catch (error) {
-        console.error('Search trade publish failed:', error)
-      }
+      await store.search()
     }
 
     const handleReset = async () => {
-      try {
-        await store.resetSearch()
-      } catch (error) {
-        console.error('Reset trade publish filter failed:', error)
-      }
+      await store.resetSearch()
     }
 
     const handleAdd = () => {
@@ -325,21 +342,16 @@ export default {
     }
 
     const handleViewDetail = async row => {
-      try {
-        await store.openDetail(row.id)
-      } catch (error) {
-        console.error('Open trade publish detail failed:', error)
-      }
+      await store.openDetail(row.id)
     }
 
     const handleDelete = async row => {
       try {
-        await ElMessageBox.confirm(`确定要删除交易“${row.title}”吗？`, '提示', {
+        await ElMessageBox.confirm(`确认删除交易“${row.title}”吗？`, '提示', {
           confirmButtonText: '确定',
           cancelButtonText: '取消',
           type: 'warning'
         })
-
         await store.deleteById(row.id)
         ElMessage.success('删除成功')
       } catch (error) {
@@ -362,7 +374,6 @@ export default {
           cancelButtonText: '取消',
           type: 'success'
         })
-
         await store.auditRows([row.id], 'approve')
         ElMessage.success('审核通过')
       } catch (error) {
@@ -380,7 +391,6 @@ export default {
           inputPlaceholder: '例如：信息不完整，请补充后重新提交',
           inputValue: ''
         })
-
         await store.auditRows([row.id], 'reject', value || '')
         ElMessage.success('已驳回')
       } catch (error) {
@@ -395,14 +405,12 @@ export default {
         ElMessage.warning('请先勾选待审核的交易')
         return
       }
-
       try {
         await ElMessageBox.confirm(`确认批量通过 ${selectedAuditableIds.value.length} 条交易吗？`, '批量审核', {
           confirmButtonText: '确定',
           cancelButtonText: '取消',
           type: 'success'
         })
-
         await store.auditRows(selectedAuditableIds.value, 'approve')
         ElMessage.success('批量审核通过完成')
       } catch (error) {
@@ -417,7 +425,6 @@ export default {
         ElMessage.warning('请先勾选待审核的交易')
         return
       }
-
       try {
         const { value } = await ElMessageBox.prompt('请输入批量驳回说明（可选）', '批量驳回', {
           confirmButtonText: '确定',
@@ -425,7 +432,6 @@ export default {
           inputPlaceholder: '例如：请补充交易描述后重新提交',
           inputValue: ''
         })
-
         await store.auditRows(selectedAuditableIds.value, 'reject', value || '')
         ElMessage.success('批量驳回完成')
       } catch (error) {
@@ -436,19 +442,11 @@ export default {
     }
 
     const handleSizeChange = async val => {
-      try {
-        await store.setPageSize(val)
-      } catch (error) {
-        console.error('Change trade publish page size failed:', error)
-      }
+      await store.setPageSize(val)
     }
 
     const handleCurrentChange = async val => {
-      try {
-        await store.setCurrentPage(val)
-      } catch (error) {
-        console.error('Change trade publish page failed:', error)
-      }
+      await store.setCurrentPage(val)
     }
 
     const handleDetailClose = () => {
@@ -456,18 +454,12 @@ export default {
     }
 
     const formatAmount = amount => formatCurrency(amount)
-    const getStatusType = status => getTradeStatusType(status)
-    const getStatusText = status => getTradeStatusText(status)
 
     onMounted(async () => {
-      try {
-        await Promise.all([
-          store.fetchData(),
-          loadTradeCategoryOptions()
-        ])
-      } catch (error) {
-        console.error('Load trade publish list failed:', error)
-      }
+      await Promise.all([
+        store.fetchData(),
+        loadTradeCategoryOptions()
+      ])
     })
 
     onUnmounted(() => {
@@ -503,8 +495,12 @@ export default {
       selectedAuditableIds,
       auditLoading,
       auditAction,
-      getStatusType,
-      getStatusText
+      getTradeStatusType,
+      getTradeStatusText,
+      getOrderStatusType,
+      getOrderStatusText,
+      resolveFlowStatus,
+      resolveFlowStatusText
     }
   }
 }
@@ -530,21 +526,10 @@ export default {
   margin-bottom: 16px;
 }
 
-.header-left {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
 .page-title {
   font-size: 16px;
   font-weight: 700;
   color: #303133;
-}
-
-.header-right {
-  display: flex;
-  align-items: center;
 }
 
 .action-toolbar {
@@ -578,10 +563,10 @@ export default {
   justify-content: flex-end;
 }
 
+.amount-text,
 .amount-red {
   color: #f56c6c;
   font-weight: 700;
-  font-size: 14px;
 }
 
 .detail-image-list {
