@@ -2,9 +2,9 @@ export const TRADE_STATUS_OPTIONS = [
   { label: '草稿', value: 'draft' },
   { label: '审核中', value: 'auditing' },
   { label: '已发布', value: 'published' },
-  { label: '未通过', value: 'rejected' },
-  { label: '交易中', value: 'trading' },
-  { label: '交易结束', value: 'completed' }
+  { label: '驳回', value: 'rejected' },
+  { label: '进行中', value: 'trading' },
+  { label: '已完成', value: 'completed' }
 ]
 
 export const TRADE_STATUS_TYPE_MAP = {
@@ -13,7 +13,7 @@ export const TRADE_STATUS_TYPE_MAP = {
   published: 'primary',
   rejected: 'danger',
   trading: 'success',
-  completed: ''
+  completed: 'success'
 }
 
 export const TRADE_STATUS_TEXT_MAP = TRADE_STATUS_OPTIONS.reduce((acc, item) => {
@@ -26,7 +26,6 @@ export const ORDER_STATUS_OPTIONS = [
   { label: '待确认', value: 'pending' },
   { label: '进行中', value: 'progress' },
   { label: '待委托方确认', value: 'confirm_pending' },
-  { label: '待支付', value: 'pay_pending' },
   { label: '已完成', value: 'success' },
   { label: '已取消', value: 'cancel' }
 ]
@@ -36,7 +35,6 @@ export const ORDER_STATUS_TYPE_MAP = {
   pending: 'warning',
   progress: 'primary',
   confirm_pending: 'warning',
-  pay_pending: 'danger',
   success: 'success',
   cancel: 'info'
 }
@@ -50,7 +48,7 @@ export const QUALIFICATION_STATUS_OPTIONS = [
   { label: '草稿', value: 'draft' },
   { label: '审核中', value: 'auditing' },
   { label: '已通过', value: 'approved' },
-  { label: '未通过', value: 'rejected' }
+  { label: '驳回', value: 'rejected' }
 ]
 
 export const QUALIFICATION_STATUS_TYPE_MAP = {

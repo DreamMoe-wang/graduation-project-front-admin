@@ -45,14 +45,6 @@
       <el-col :xs="12" :sm="8" :md="8" :lg="4" :xl="4">
         <el-card shadow="hover" class="stat-card">
           <div class="stat-item">
-            <div class="stat-label">待支付</div>
-            <div class="stat-value stat-pay">{{ displayOrderStats.payPendingCount }}</div>
-          </div>
-        </el-card>
-      </el-col>
-      <el-col :xs="12" :sm="8" :md="8" :lg="4" :xl="4">
-        <el-card shadow="hover" class="stat-card">
-          <div class="stat-item">
             <div class="stat-label">已完成</div>
             <div class="stat-value stat-success">{{ displayOrderStats.successCount }}</div>
           </div>
@@ -120,23 +112,13 @@
             </el-button>
             <el-button
               v-if="canConfirm(item)"
-              v-permission="'trade:order:view'"
+              v-permission="{ any: ['trade:publish:view', 'trade:order:view'] }"
               type="primary"
               size="small"
               :loading="isActionLoading(getActionOrderId(item), 'confirm')"
               @click="handleConfirm(item)"
             >
               委托方确认
-            </el-button>
-            <el-button
-              v-if="canPay(item)"
-              v-permission="'trade:order:view'"
-              type="warning"
-              size="small"
-              :loading="isActionLoading(getActionOrderId(item), 'pay')"
-              @click="handlePay(item)"
-            >
-              去支付
             </el-button>
             <el-button
               v-if="canCancel(item)"
@@ -177,57 +159,6 @@
         @current-change="handleCurrentChange"
       />
     </div>
-
-    <el-dialog v-model="detailVisible" title="订单详情" width="600px">
-      <el-descriptions v-if="currentOrder" :column="1" border>
-        <el-descriptions-item label="订单号">{{ currentOrder.orderNo || '-' }}</el-descriptions-item>
-        <el-descriptions-item label="任务标题">{{ currentOrder.title || '-' }}</el-descriptions-item>
-        <el-descriptions-item label="所在区域">{{ currentOrder.location || currentOrder.area || '-' }}</el-descriptions-item>
-        <el-descriptions-item label="交易类型">
-          {{ (currentOrder.categoryNames || []).join(' / ') || '-' }}
-        </el-descriptions-item>
-        <el-descriptions-item label="创建时间">{{ currentOrder.createTime || '-' }}</el-descriptions-item>
-        <el-descriptions-item label="接单人">
-          {{
-            currentOrder.receiver?.displayName
-              || currentOrder.receiver?.nickname
-              || currentOrder.receiver?.username
-              || '-'
-          }}
-        </el-descriptions-item>
-        <el-descriptions-item label="接单人电话">{{ currentOrder.receiver?.phone || '-' }}</el-descriptions-item>
-        <el-descriptions-item label="订单金额">
-          <span class="price-text">￥{{ formatPrice(currentOrder.price ?? currentOrder.amount) }}</span>
-        </el-descriptions-item>
-        <el-descriptions-item label="订单状态">
-          <el-tag :type="getStatusType(getDisplayStatus(currentOrder))" size="small">
-            {{ getStatusText(getDisplayStatus(currentOrder)) }}
-          </el-tag>
-        </el-descriptions-item>
-      </el-descriptions>
-    </el-dialog>
-
-    <el-dialog v-model="publishTradeDetailVisible" title="发布详情" width="600px">
-      <el-descriptions v-if="currentPublishTrade" :column="1" border>
-        <el-descriptions-item label="发布单号">{{ currentPublishTrade.postNo || '-' }}</el-descriptions-item>
-        <el-descriptions-item label="关联订单号">{{ currentPublishTrade.orderNo || '-' }}</el-descriptions-item>
-        <el-descriptions-item label="任务标题">{{ currentPublishTrade.title || '-' }}</el-descriptions-item>
-        <el-descriptions-item label="所在区域">{{ currentPublishTrade.location || '-' }}</el-descriptions-item>
-        <el-descriptions-item label="交易类型">
-          {{ (currentPublishTrade.categoryNames || []).join(' / ') || '-' }}
-        </el-descriptions-item>
-        <el-descriptions-item label="发布状态">
-          <el-tag :type="getTradeStatusType(currentPublishTrade.status)" size="small">
-            {{ getTradeStatusText(currentPublishTrade.status) }}
-          </el-tag>
-        </el-descriptions-item>
-        <el-descriptions-item label="流程状态">
-          <el-tag :type="getStatusType(getDisplayStatus(currentPublishTrade))" size="small">
-            {{ getStatusText(getDisplayStatus(currentPublishTrade)) }}
-          </el-tag>
-        </el-descriptions-item>
-      </el-descriptions>
-    </el-dialog>
   </div>
 </template>
 
@@ -237,13 +168,8 @@ import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import {
-  getOrderStatusText,
-  getOrderStatusType,
-  getTradeStatusText,
-  getTradeStatusType
-} from '@/config/statusConfig'
-import { getTradePublishDetail, getTradePublishPage } from '@/api/tradePublish'
+import { getOrderStatusText, getOrderStatusType } from '@/config/statusConfig'
+import { getTradePublishPage } from '@/api/tradePublish'
 import { formatCurrency } from '@/utils/format'
 import { useAuthStore } from '@/stores/auth'
 import { useTradeOrderStore } from '@/stores/tradeOrder'
@@ -255,49 +181,52 @@ const ROLE_ROUTE_MAP = {
   receiver: '/trade/order/receive'
 }
 
-const PUBLISH_FLOW_SET = new Set(['published', 'pending', 'progress', 'confirm_pending', 'pay_pending', 'success'])
+const PUBLISH_FLOW_SET = new Set(['published', 'pending', 'progress', 'confirm_pending', 'success'])
 
 function resolveOrderRoleByPath(path = '') {
   return path === ROLE_ROUTE_MAP.receiver ? 'receiver' : 'publisher'
 }
 
 function normalizeTradeStatus(status) {
-  if (!status && status !== 0) return ''
-  const map = {
-    0: 'draft',
-    1: 'auditing',
-    2: 'rejected',
-    3: 'published',
-    4: 'trading',
-    5: 'completed'
+  if (status == null || status === '') return ''
+  if (typeof status === 'number') {
+    return {
+      0: 'draft',
+      1: 'auditing',
+      2: 'rejected',
+      3: 'published',
+      4: 'trading',
+      5: 'completed'
+    }[status] || String(status)
   }
-  if (typeof status === 'number') return map[status] || String(status)
   return String(status)
 }
 
 function normalizeOrderStatus(status) {
-  if (!status && status !== 0) return ''
-  const map = {
-    0: 'pending',
-    1: 'progress',
-    2: 'confirm_pending',
-    3: 'success',
-    4: 'cancel'
+  if (status == null || status === '') return ''
+  if (typeof status === 'number') {
+    return {
+      0: 'pending',
+      1: 'progress',
+      2: 'confirm_pending',
+      3: 'success',
+      4: 'cancel'
+    }[status] || String(status)
   }
-  if (typeof status === 'number') return map[status] || String(status)
-  return map[String(status)] || String(status)
+  return String(status)
 }
 
 function normalizePayStatus(status) {
-  if (!status && status !== 0) return ''
-  const map = {
-    0: 'unpaid',
-    1: 'paid',
-    2: 'refunded',
-    3: 'settled'
+  if (status == null || status === '') return ''
+  if (typeof status === 'number') {
+    return {
+      0: 'unpaid',
+      1: 'paid',
+      2: 'refunded',
+      3: 'settled'
+    }[status] || String(status)
   }
-  if (typeof status === 'number') return map[status] || String(status)
-  return map[String(status)] || String(status)
+  return String(status)
 }
 
 export default {
@@ -312,7 +241,7 @@ export default {
     const authStore = useAuthStore()
     const route = useRoute()
     const router = useRouter()
-    const { loading, orderList, pagination, detailVisible, currentOrder } = storeToRefs(store)
+    const { loading, orderList, pagination } = storeToRefs(store)
     const { currentUser } = storeToRefs(authStore)
 
     const activeOrderRole = ref(resolveOrderRoleByPath(route.path))
@@ -320,8 +249,6 @@ export default {
     const qualificationRecord = ref(null)
     const tradeCategoryOptions = ref([])
     const publishTradeList = ref([])
-    const publishTradeDetailVisible = ref(false)
-    const currentPublishTrade = ref(null)
 
     const roleOptions = [
       { label: '发布订单', value: 'publisher' },
@@ -339,8 +266,8 @@ export default {
     const pageTitle = computed(() => (activeOrderRole.value === 'publisher' ? '发布订单' : '接取订单'))
     const pageSubtitle = computed(() => (
       activeOrderRole.value === 'publisher'
-        ? '统一展示从发布中开始进入订单流程的记录。'
-        : '统一展示接单后的状态流转与履约流程。'
+        ? '显示当前用户发布后的订单流程记录。'
+        : '显示当前用户接取后的订单流程记录。'
     ))
 
     const approvedQualificationTypes = computed(() => (
@@ -426,7 +353,6 @@ export default {
       const sourceList = activeOrderRole.value === 'publisher'
         ? normalizedPublisherTrades.value.filter(item => PUBLISH_FLOW_SET.has(getDisplayStatus(item)))
         : normalizedReceiverOrders.value.filter(item => item.receiverId === currentUserId.value)
-
       return sourceList
     })
 
@@ -447,7 +373,6 @@ export default {
       if (item.__recordType === 'publish') {
         return item.flowStatus || item.tradeStatus || ''
       }
-      if (item.status === 'success' && (item.payStatus || 'unpaid') === 'unpaid') return 'pay_pending'
       return item.status
     }
 
@@ -456,14 +381,12 @@ export default {
       stats.totalCount += 1
       if (status === 'published' || status === 'pending') stats.pendingCount += 1
       else if (status === 'progress' || status === 'confirm_pending') stats.progressCount += 1
-      else if (status === 'pay_pending') stats.payPendingCount += 1
       else if (status === 'success') stats.successCount += 1
       return stats
     }, {
       totalCount: 0,
       pendingCount: 0,
       progressCount: 0,
-      payPendingCount: 0,
       successCount: 0
     }))
 
@@ -509,7 +432,6 @@ export default {
     const canReceive = item => item?.__recordType === 'order' && activeOrderRole.value === 'receiver' && getDisplayStatus(item) === 'pending' && hasRequiredQualification(item)
     const canComplete = item => item?.__recordType === 'order' && isReceiver(item) && getDisplayStatus(item) === 'progress'
     const canConfirm = item => isPublisher(item) && !!getActionOrderId(item) && getDisplayStatus(item) === 'confirm_pending'
-    const canPay = item => isPublisher(item) && !!getActionOrderId(item) && getDisplayStatus(item) === 'pay_pending'
     const canCancel = item => item?.__recordType === 'order' && isReceiver(item) && ['pending', 'progress', 'confirm_pending'].includes(getDisplayStatus(item))
     const canContact = item => !!getActionOrderId(item)
 
@@ -553,75 +475,42 @@ export default {
       await fetchRoleData()
     }
 
-    const handleViewDetail = async item => {
-      try {
-        const orderId = getActionOrderId(item)
-        if (item.__recordType === 'publish' && !orderId) {
-          currentPublishTrade.value = await getTradePublishDetail(item.id)
-          publishTradeDetailVisible.value = true
-          return
-        }
-        if (orderId) {
-          await store.openDetail(orderId)
-        }
-      } catch (error) {
-        console.error('Open detail failed:', error)
+    const handleViewDetail = item => {
+      const orderId = getActionOrderId(item)
+      if (!orderId) {
+        ElMessage.info('当前是未成单记录，可在交易发布页查看详细发布信息')
+        return
       }
+      store.openDetail(orderId)
     }
 
     const handleReceive = async item => {
-      try {
-        const allowed = await ensureQualificationApproved(item)
-        if (!allowed) return
-        await store.receive(item.id)
-        ElMessage.success('接单成功')
-      } catch (error) {
-        console.error('Receive order failed:', error)
-      }
+      const allowed = await ensureQualificationApproved(item)
+      if (!allowed) return
+      await store.receive(item.id)
+      ElMessage.success('接单成功')
     }
 
     const handleComplete = async item => {
-      try {
-        await store.complete(item.id)
-        ElMessage.success('已提交完成，等待委托方确认')
-      } catch (error) {
-        console.error('Complete order failed:', error)
-      }
+      await store.complete(item.id)
+      ElMessage.success('已提交完成，等待委托方确认')
     }
 
     const handleConfirm = async item => {
-      try {
-        await store.confirm(getActionOrderId(item))
-        ElMessage.success('委托方已确认完成，可进入支付')
-      } catch (error) {
-        console.error('Confirm order failed:', error)
-      }
-    }
-
-    const handlePay = async item => {
-      try {
-        await store.pay(getActionOrderId(item))
-        ElMessage.success('支付成功')
-      } catch (error) {
-        console.error('Pay order failed:', error)
-      }
+      await store.confirm(getActionOrderId(item))
+      ElMessage.success('委托方已确认完成')
+      await fetchRoleData()
     }
 
     const handleCancel = async item => {
       const actionText = getDisplayStatus(item) === 'pending' ? '退单' : '取消订单'
-      try {
-        await ElMessageBox.confirm(`确定要${actionText}“${item.orderNo}”吗？`, '提示', {
-          confirmButtonText: '确定',
-          cancelButtonText: '取消',
-          type: 'warning'
-        })
-        await store.cancel(getActionOrderId(item))
-        ElMessage.success(`${actionText}成功`)
-      } catch (error) {
-        if (error !== 'cancel' && error !== 'close') {
-          console.error('Cancel order failed:', error)
-        }
-      }
+      await ElMessageBox.confirm(`确定要${actionText}“${item.orderNo}”吗？`, '提示', {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'warning'
+      })
+      await store.cancel(getActionOrderId(item))
+      ElMessage.success(`${actionText}成功`)
     }
 
     const handleContact = item => {
@@ -676,8 +565,6 @@ export default {
     onUnmounted(() => {
       store.resetTransientState()
       publishTradeList.value = []
-      currentPublishTrade.value = null
-      publishTradeDetailVisible.value = false
     })
 
     return {
@@ -691,14 +578,9 @@ export default {
       emptyDescription,
       displayOrderStats,
       pagination,
-      detailVisible,
-      currentOrder,
-      publishTradeDetailVisible,
-      currentPublishTrade,
       canReceive,
       canComplete,
       canConfirm,
-      canPay,
       canCancel,
       canContact,
       getQualificationWarning,
@@ -707,7 +589,6 @@ export default {
       handleReceive,
       handleComplete,
       handleConfirm,
-      handlePay,
       handleCancel,
       handleContact,
       handleSizeChange,
@@ -716,8 +597,6 @@ export default {
       getDisplayStatus,
       getStatusType,
       getStatusText,
-      getTradeStatusType,
-      getTradeStatusText,
       getActionOrderId,
       isActionLoading
     }
@@ -807,10 +686,6 @@ export default {
   color: #67c23a;
 }
 
-.stat-pay {
-  color: #f56c6c;
-}
-
 .order-card {
   margin-bottom: 16px;
 }
@@ -881,24 +756,6 @@ export default {
   margin-top: 20px;
   display: flex;
   justify-content: flex-end;
-}
-
-.price-text {
-  color: #f56c6c;
-  font-weight: 700;
-}
-
-.detail-image-list {
-  display: flex;
-  gap: 12px;
-  flex-wrap: wrap;
-}
-
-.detail-image {
-  width: 88px;
-  height: 88px;
-  border-radius: 10px;
-  overflow: hidden;
 }
 
 @media (max-width: 768px) {
