@@ -17,7 +17,7 @@ import {
 function createDefaultSearchForm() {
   return {
     title: '',
-    status: ''
+    status: 'all'
   }
 }
 

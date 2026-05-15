@@ -285,6 +285,11 @@ export default {
       .filter(item => store.isAuditable(item))
       .map(item => item.id))
 
+    const statusOptions = computed(() => ([
+      { label: '全部', value: 'all' },
+      ...TRADE_STATUS_OPTIONS
+    ]))
+
     const loadTradeCategoryOptions = async () => {
       try {
         const list = await getTradeCategoryList()
@@ -493,7 +498,7 @@ export default {
       handleCurrentChange,
       handleDetailClose,
       formatAmount,
-      statusOptions: TRADE_STATUS_OPTIONS,
+      statusOptions,
       selectedRows,
       selectedAuditableIds,
       auditLoading,

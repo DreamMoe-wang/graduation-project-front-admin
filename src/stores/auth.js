@@ -38,7 +38,7 @@ function createDevMenus() {
     {
       id: 1001,
       parentId: 0,
-      name: '首页',
+      name: '??',
       menuType: 2,
       path: '/',
       routeName: 'Dashboard',
@@ -49,7 +49,7 @@ function createDevMenus() {
     {
       id: 1040,
       parentId: 0,
-      name: '资格认证',
+      name: '????',
       menuType: 2,
       path: '/qualification',
       routeName: 'QualificationManage',
@@ -60,7 +60,7 @@ function createDevMenus() {
     {
       id: 1002,
       parentId: 0,
-      name: '交易集市',
+      name: '????',
       menuType: 1,
       path: '/trade',
       routeName: 'TradeMarket',
@@ -70,7 +70,7 @@ function createDevMenus() {
         {
           id: 1003,
           parentId: 1002,
-          name: '交易发布',
+          name: '????',
           menuType: 2,
           path: '/trade/publish',
           routeName: 'TradePublish',
@@ -81,7 +81,7 @@ function createDevMenus() {
         {
           id: 1004,
           parentId: 1002,
-          name: '交易大全',
+          name: '????',
           menuType: 2,
           path: '/trade/list',
           routeName: 'TradeList',
@@ -94,7 +94,7 @@ function createDevMenus() {
     {
       id: 1005,
       parentId: 0,
-      name: '我的订单',
+      name: '????',
       menuType: 1,
       path: '/trade/order',
       routeName: 'TradeOrder',
@@ -104,7 +104,7 @@ function createDevMenus() {
         {
           id: 1031,
           parentId: 1005,
-          name: '发布订单',
+          name: '????',
           menuType: 2,
           path: '/trade/order/publish',
           routeName: 'TradeOrderPublish',
@@ -115,7 +115,7 @@ function createDevMenus() {
         {
           id: 1032,
           parentId: 1005,
-          name: '接取订单',
+          name: '????',
           menuType: 2,
           path: '/trade/order/receive',
           routeName: 'TradeOrderReceive',
@@ -128,7 +128,7 @@ function createDevMenus() {
     {
       id: 1006,
       parentId: 0,
-      name: '聊天室',
+      name: '???',
       menuType: 2,
       path: '/chat',
       routeName: 'ChatRoom',
@@ -139,7 +139,7 @@ function createDevMenus() {
     {
       id: 1007,
       parentId: 0,
-      name: '用户管理',
+      name: '????',
       menuType: 2,
       path: '/user',
       routeName: 'UserManage',
@@ -148,20 +148,20 @@ function createDevMenus() {
       children: []
     },
     {
-      id: 1009,
+      id: 1046,
       parentId: 0,
-      name: '菜单管理',
+      name: '??????',
       menuType: 2,
-      path: '/menu',
-      routeName: 'MenuManage',
-      component: 'menu/MenuManage',
-      icon: 'Menu',
+      path: '/trade/category',
+      routeName: 'TradeCategoryManage',
+      component: 'trade/TradeCategoryManage',
+      icon: 'PriceTag',
       children: []
     },
     {
       id: 1010,
       parentId: 0,
-      name: '通知公告',
+      name: '????',
       menuType: 2,
       path: '/notice',
       routeName: 'NoticeManage',
@@ -172,7 +172,7 @@ function createDevMenus() {
     {
       id: 1011,
       parentId: 0,
-      name: '日志管理',
+      name: '????',
       menuType: 2,
       path: '/log',
       routeName: 'LogManage',
@@ -183,7 +183,7 @@ function createDevMenus() {
     {
       id: 1012,
       parentId: 0,
-      name: '系统设置',
+      name: '????',
       menuType: 2,
       path: '/setting',
       routeName: 'SystemSetting',
@@ -194,7 +194,7 @@ function createDevMenus() {
     {
       id: 1030,
       parentId: 0,
-      name: '个人中心',
+      name: '????',
       menuType: 2,
       path: '/profile',
       routeName: 'ProfileCenter',

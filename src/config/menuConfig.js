@@ -57,9 +57,9 @@ export default [
     icon: 'User'
   },
   {
-    path: '/menu',
-    name: '菜单管理',
-    icon: 'Menu'
+    path: '/trade/category',
+    name: '??????',
+    icon: 'PriceTag'
   },
   {
     path: '/notice',

@@ -22,6 +22,7 @@ export const TRADE_STATUS_TEXT_MAP = TRADE_STATUS_OPTIONS.reduce((acc, item) => 
 }, {})
 
 export const ORDER_STATUS_OPTIONS = [
+  { label: '发布中', value: 'published' },
   { label: '待确认', value: 'pending' },
   { label: '进行中', value: 'progress' },
   { label: '待委托方确认', value: 'confirm_pending' },
@@ -31,6 +32,7 @@ export const ORDER_STATUS_OPTIONS = [
 ]
 
 export const ORDER_STATUS_TYPE_MAP = {
+  published: 'primary',
   pending: 'warning',
   progress: 'primary',
   confirm_pending: 'warning',

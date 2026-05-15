@@ -13,8 +13,8 @@
       />
     </div>
 
-    <div v-if="activeOrderRole === 'receiver' && !canTakeOrders" class="qualification-tip">
-      接单前需要先完成并通过“资格认证”。
+    <div v-if="activeOrderRole === 'receiver' && showQualificationTip" class="qualification-tip">
+      仅命中需要资格认证标签的订单，在接取前才需要通过对应资格认证。
     </div>
 
     <el-row :gutter="20" class="stats-row">
@@ -62,9 +62,9 @@
 
     <div v-loading="loading">
       <template v-if="visibleOrderList.length">
-        <el-card v-for="item in visibleOrderList" :key="item.id" class="order-card">
+        <el-card v-for="item in visibleOrderList" :key="`${item.__recordType}-${item.id}`" class="order-card">
           <div class="order-header">
-            <span class="order-no">订单号：{{ item.orderNo }}</span>
+            <span class="order-no">订单号：{{ item.orderNo || '-' }}</span>
             <el-tag :type="getStatusType(getDisplayOrderStatus(item))" size="small">
               {{ getStatusText(getDisplayOrderStatus(item)) }}
             </el-tag>
@@ -76,7 +76,7 @@
               <p class="order-info">
                 <span>
                   <el-icon><Location /></el-icon>
-                  {{ item.area || '暂无区域' }}
+                  {{ item.location || item.area || '暂无区域' }}
                 </span>
                 <span>
                   <el-icon><CollectionTag /></el-icon>
@@ -84,21 +84,23 @@
                 </span>
                 <span>
                   <el-icon><Clock /></el-icon>
-                  {{ item.createTime || '暂无时间' }}
+                  {{ item.createTime || item.publishTime || '暂无时间' }}
                 </span>
               </p>
             </div>
             <div class="order-right">
-              <div class="order-price">¥{{ formatPrice(item.price) }}</div>
+              <div class="order-price">￥{{ formatPrice(item.price ?? item.amount) }}</div>
             </div>
           </div>
 
-          <div v-if="getQualificationWarning(item)" class="qualification-item-tip">{{ getQualificationWarning(item) }}</div>
+          <div v-if="getQualificationWarning(item)" class="qualification-item-tip">
+            {{ getQualificationWarning(item) }}
+          </div>
 
           <div class="order-actions">
             <el-button
               v-if="canReceive(item)"
-              v-permission="'trade:order:view'"
+              v-permission="'trade:order:receive'"
               type="primary"
               size="small"
               :loading="isActionLoading(item.id, 'receive')"
@@ -108,7 +110,7 @@
             </el-button>
             <el-button
               v-if="canComplete(item)"
-              v-permission="'trade:order:view'"
+              v-permission="'trade:order:complete'"
               type="success"
               size="small"
               :loading="isActionLoading(item.id, 'complete')"
@@ -138,18 +140,19 @@
             </el-button>
             <el-button
               v-if="canCancel(item)"
-              v-permission="'trade:order:view'"
+              v-permission="'trade:order:cancel'"
               type="danger"
               size="small"
               plain
               :loading="isActionLoading(item.id, 'cancel')"
               @click="handleCancel(item)"
             >
-              {{ item.status === 'pending' ? '退单' : '取消订单' }}
+              {{ getDisplayOrderStatus(item) === 'pending' ? '退单' : '取消订单' }}
             </el-button>
             <el-button size="small" plain @click="handleViewDetail(item)">查看详情</el-button>
             <el-button
-              v-permission="['chat:contact', 'chat:view']"
+              v-if="canContact(item)"
+              v-permission="{ any: ['chat:contact', 'chat:view'] }"
               size="small"
               plain
               @click="handleContact(item)"
@@ -177,11 +180,11 @@
 
     <el-dialog v-model="detailVisible" title="订单详情" width="600px">
       <el-descriptions v-if="currentOrder" :column="1" border>
-        <el-descriptions-item label="订单号">{{ currentOrder.orderNo }}</el-descriptions-item>
-        <el-descriptions-item label="任务标题">{{ currentOrder.title }}</el-descriptions-item>
-        <el-descriptions-item label="所在区域">{{ currentOrder.area || '-' }}</el-descriptions-item>
+        <el-descriptions-item label="订单号">{{ currentOrder.orderNo || '-' }}</el-descriptions-item>
+        <el-descriptions-item label="任务标题">{{ currentOrder.title || '-' }}</el-descriptions-item>
+        <el-descriptions-item label="所在区域">{{ currentOrder.location || currentOrder.area || '-' }}</el-descriptions-item>
         <el-descriptions-item label="交易类型">
-          {{ (currentOrder.categoryNames || []).join(' / ') || '无' }}
+          {{ (currentOrder.categoryNames || []).join(' / ') || '-' }}
         </el-descriptions-item>
         <el-descriptions-item label="创建时间">{{ currentOrder.createTime || '-' }}</el-descriptions-item>
         <el-descriptions-item label="接单人">
@@ -189,26 +192,20 @@
             currentOrder.receiver?.displayName
               || currentOrder.receiver?.nickname
               || currentOrder.receiver?.username
-              || '暂无'
+              || '-'
           }}
         </el-descriptions-item>
-        <el-descriptions-item label="接单人电话">
-          {{ currentOrder.receiver?.phone || '暂无' }}
-        </el-descriptions-item>
+        <el-descriptions-item label="接单人电话">{{ currentOrder.receiver?.phone || '-' }}</el-descriptions-item>
         <el-descriptions-item label="订单金额">
-          <span class="price-text">¥{{ formatPrice(currentOrder.price) }}</span>
+          <span class="price-text">￥{{ formatPrice(currentOrder.price ?? currentOrder.amount) }}</span>
         </el-descriptions-item>
         <el-descriptions-item label="订单状态">
           <el-tag :type="getStatusType(getDisplayOrderStatus(currentOrder))" size="small">
             {{ getStatusText(getDisplayOrderStatus(currentOrder)) }}
           </el-tag>
         </el-descriptions-item>
-        <el-descriptions-item label="支付网关">
-          {{ currentOrder.payGateway || '未支付' }}
-        </el-descriptions-item>
-        <el-descriptions-item label="支付时间">
-          {{ currentOrder.payTime || '暂无' }}
-        </el-descriptions-item>
+        <el-descriptions-item label="支付网关">{{ currentOrder.payGateway || '未支付' }}</el-descriptions-item>
+        <el-descriptions-item label="支付时间">{{ currentOrder.payTime || '-' }}</el-descriptions-item>
         <el-descriptions-item label="图片信息">
           <div v-if="currentOrder.imageUrls?.length" class="detail-image-list">
             <el-image
@@ -221,7 +218,55 @@
               class="detail-image"
             />
           </div>
-          <span v-else>无</span>
+          <span v-else>-</span>
+        </el-descriptions-item>
+      </el-descriptions>
+    </el-dialog>
+
+    <el-dialog v-model="publishTradeDetailVisible" title="订单详情" width="600px">
+      <el-descriptions v-if="currentPublishTrade" :column="1" border>
+        <el-descriptions-item label="订单号">
+          {{ currentPublishTrade.postNo || currentPublishTrade.orderNo || '-' }}
+        </el-descriptions-item>
+        <el-descriptions-item label="任务标题">{{ currentPublishTrade.title || '-' }}</el-descriptions-item>
+        <el-descriptions-item label="所在区域">
+          {{ currentPublishTrade.location || currentPublishTrade.address || '-' }}
+        </el-descriptions-item>
+        <el-descriptions-item label="交易类型">
+          {{ (currentPublishTrade.categoryNames || []).join(' / ') || '-' }}
+        </el-descriptions-item>
+        <el-descriptions-item label="创建时间">
+          {{ currentPublishTrade.createTime || currentPublishTrade.publishTime || '-' }}
+        </el-descriptions-item>
+        <el-descriptions-item label="接单人">
+          {{ currentPublishTrade.workerName || currentPublishTrade.receiver?.displayName || '-' }}
+        </el-descriptions-item>
+        <el-descriptions-item label="接单人电话">
+          {{ currentPublishTrade.workerPhone || currentPublishTrade.receiver?.phone || '-' }}
+        </el-descriptions-item>
+        <el-descriptions-item label="订单金额">
+          <span class="price-text">￥{{ formatPrice(currentPublishTrade.price ?? currentPublishTrade.amount) }}</span>
+        </el-descriptions-item>
+        <el-descriptions-item label="订单状态">
+          <el-tag :type="getStatusType(getDisplayOrderStatus(currentPublishTrade))" size="small">
+            {{ getStatusText(getDisplayOrderStatus(currentPublishTrade)) }}
+          </el-tag>
+        </el-descriptions-item>
+        <el-descriptions-item label="支付网关">未支付</el-descriptions-item>
+        <el-descriptions-item label="支付时间">-</el-descriptions-item>
+        <el-descriptions-item label="图片信息">
+          <div v-if="currentPublishTrade.imageUrls?.length" class="detail-image-list">
+            <el-image
+              v-for="(url, index) in currentPublishTrade.imageUrls"
+              :key="`${url}-${index}`"
+              :src="url"
+              :preview-src-list="currentPublishTrade.imageUrls"
+              preview-teleported
+              fit="cover"
+              class="detail-image"
+            />
+          </div>
+          <span v-else>-</span>
         </el-descriptions-item>
       </el-descriptions>
     </el-dialog>
@@ -235,6 +280,7 @@ import { storeToRefs } from 'pinia'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { getOrderStatusText, getOrderStatusType } from '@/config/statusConfig'
+import { getTradePublishDetail, getTradePublishPage } from '@/api/tradePublish'
 import { formatCurrency } from '@/utils/format'
 import { useAuthStore } from '@/stores/auth'
 import { useTradeOrderStore } from '@/stores/tradeOrder'
@@ -246,8 +292,66 @@ const ROLE_ROUTE_MAP = {
   receiver: '/trade/order/receive'
 }
 
+const APPROVED_PUBLISH_STATUSES = new Set(['published', 'trading', 'completed'])
+
 function resolveOrderRoleByPath(path = '') {
   return path === ROLE_ROUTE_MAP.receiver ? 'receiver' : 'publisher'
+}
+
+function normalizeTradePostStatus(status) {
+  if (status == null || status === '') return ''
+
+  const statusMap = {
+    0: 'draft',
+    1: 'auditing',
+    2: 'rejected',
+    3: 'published',
+    4: 'trading',
+    5: 'completed'
+  }
+
+  if (typeof status === 'number') {
+    return statusMap[status] || String(status)
+  }
+
+  return String(status)
+}
+
+function normalizeOrderStatus(status) {
+  if (status == null || status === '') return ''
+
+  const statusMap = {
+    0: 'pending',
+    1: 'progress',
+    2: 'confirm_pending',
+    3: 'success',
+    4: 'cancel'
+  }
+
+  if (typeof status === 'number') {
+    return statusMap[status] || String(status)
+  }
+
+  const normalized = String(status)
+  return statusMap[normalized] || normalized
+}
+
+function normalizePayStatus(status) {
+  if (status == null || status === '') return ''
+
+  const statusMap = {
+    0: 'unpaid',
+    1: 'paid',
+    2: 'refunded',
+    3: 'settled'
+  }
+
+  if (typeof status === 'number') {
+    return statusMap[status] || String(status)
+  }
+
+  const normalized = String(status)
+  return statusMap[normalized] || normalized
 }
 
 export default {
@@ -266,9 +370,12 @@ export default {
     const { currentUser } = storeToRefs(authStore)
     const activeOrderRole = ref(resolveOrderRoleByPath(route.path))
     const qualificationChecked = ref(false)
-    const qualificationApproved = ref(false)
     const qualificationRecord = ref(null)
     const tradeCategoryOptions = ref([])
+    const publishTradeList = ref([])
+    const publisherOrderList = ref([])
+    const publishTradeDetailVisible = ref(false)
+    const currentPublishTrade = ref(null)
 
     const roleOptions = [
       { label: '发布订单', value: 'publisher' },
@@ -282,44 +389,154 @@ export default {
     }
 
     const currentUserId = computed(() => normalizeUserId(currentUser.value?.userId ?? currentUser.value?.id))
-    const canTakeOrders = computed(() => authStore.hasPermission('qualification:review') || qualificationApproved.value)
-    const approvedQualificationTypes = computed(() => Array.isArray(qualificationRecord.value?.approvedQualificationTypes) ? qualificationRecord.value.approvedQualificationTypes : [])
+
+    const approvedQualificationTypes = computed(() => (
+      Array.isArray(qualificationRecord.value?.approvedQualificationTypes)
+        ? qualificationRecord.value.approvedQualificationTypes
+        : []
+    ))
+
     const tradeCategoryRequirementMap = computed(() => tradeCategoryOptions.value.reduce((acc, item) => {
       if (item?.categoryName) {
         acc[item.categoryName] = !!item.requiresQualification
       }
       return acc
     }, {}))
+
     const pageTitle = computed(() => (activeOrderRole.value === 'publisher' ? '发布订单' : '接取订单'))
-    const pageSubtitle = computed(() => (activeOrderRole.value === 'publisher'
-      ? '查看自己发布的全部订单、确认验收并完成支付。'
-      : '查看自己接取的订单，并推进接单与履约流程。'))
+    const pageSubtitle = computed(() => (
+      activeOrderRole.value === 'publisher'
+        ? '显示当前用户已审核通过的发布单，以及已进入订单流程的记录。'
+        : '查看自己接取的全部订单，并推进确认、退单与履约流程。'
+    ))
 
     const extractOrderId = item => normalizeUserId(item?.id ?? item?.orderId)
-    const extractOrderUserId = profile => normalizeUserId(profile?.userId ?? profile?.id)
     const extractOrderTradeId = item => normalizeUserId(item?.postId ?? item?.tradeId)
 
-    const visibleOrderList = computed(() => {
-      if (!currentUserId.value) return orderList.value
+    const extractPublisherId = item => normalizeUserId(
+      item?.publisherId
+      ?? item?.publisher?.userId
+      ?? item?.publisher?.id
+      ?? item?.publishUserId
+      ?? item?.userId
+    )
 
-      return orderList.value.filter(item => {
-        const publisherId = extractOrderUserId(item?.publisher)
-        const receiverId = extractOrderUserId(item?.receiver)
-        return activeOrderRole.value === 'publisher'
-          ? publisherId === currentUserId.value
-          : receiverId === currentUserId.value
+    const extractReceiverId = item => normalizeUserId(
+      item?.receiverId
+      ?? item?.receiver?.userId
+      ?? item?.receiver?.id
+      ?? item?.workerId
+    )
+
+    const normalizeOrderItem = item => ({
+      ...item,
+      __recordType: 'order',
+      id: item?.id ?? item?.orderId,
+      orderNo: item?.orderNo || '',
+      postId: item?.postId ?? item?.tradeId ?? null,
+      title: item?.title || '',
+      area: item?.area || item?.location || '',
+      location: item?.location || item?.area || '',
+      categoryNames: Array.isArray(item?.categoryNames) ? item.categoryNames : [],
+      createTime: item?.createTime || '',
+      publishTime: item?.publishTime || '',
+      price: Number(item?.price ?? item?.amount ?? 0),
+      amount: Number(item?.amount ?? item?.price ?? 0),
+      payStatus: normalizePayStatus(item?.payStatus),
+      status: normalizeOrderStatus(item?.status),
+      publisherId: extractPublisherId(item),
+      receiverId: extractReceiverId(item)
+    })
+
+    const normalizePublishTradeItem = item => ({
+      ...item,
+      __recordType: 'publish',
+      id: item?.id ?? item?.postId,
+      orderNo: item?.postNo || item?.orderNo || '',
+      postId: item?.id ?? item?.postId ?? null,
+      title: item?.title || '',
+      area: item?.area || item?.areaName || item?.cityName || '',
+      location: item?.location || item?.address || item?.areaName || item?.cityName || '',
+      categoryNames: Array.isArray(item?.categoryNames) ? item.categoryNames : [],
+      createTime: item?.createTime || item?.publishTime || '',
+      publishTime: item?.publishTime || '',
+      price: Number(item?.price ?? item?.amount ?? 0),
+      amount: Number(item?.amount ?? item?.price ?? 0),
+      status: normalizeTradePostStatus(item?.status),
+      publisherId: extractPublisherId(item),
+      receiverId: extractReceiverId(item),
+      payStatus: normalizePayStatus(item?.payStatus)
+    })
+
+    const publishDisplayList = computed(() => publishTradeList.value.map(normalizePublishTradeItem))
+    const receiverDisplayList = computed(() => orderList.value.map(normalizeOrderItem))
+    const publisherOrderDisplayList = computed(() => publisherOrderList.value.map(normalizeOrderItem))
+
+    const publisherFullList = computed(() => {
+      const approvedPublishList = publishDisplayList.value.filter(item => APPROVED_PUBLISH_STATUSES.has(item.status))
+      const publisherOrders = publisherOrderDisplayList.value.filter(item => (
+        !currentUserId.value || extractPublisherId(item) === currentUserId.value
+      ))
+      const orderPostIdSet = new Set(publisherOrders.map(item => item.postId).filter(Boolean))
+      const pendingPublishList = approvedPublishList.filter(item => !orderPostIdSet.has(item.postId))
+
+      return [...publisherOrders, ...pendingPublishList].sort((left, right) => {
+        const leftTime = new Date(left.createTime || left.publishTime || 0).getTime()
+        const rightTime = new Date(right.createTime || right.publishTime || 0).getTime()
+        return rightTime - leftTime
       })
     })
 
-    const emptyDescription = computed(() => (activeOrderRole.value === 'publisher'
-      ? '暂无我发布的订单'
-      : '暂无我接取的订单'))
+    const visibleOrderList = computed(() => {
+      if (activeOrderRole.value === 'publisher') {
+        const start = (pagination.value.currentPage - 1) * pagination.value.pageSize
+        const end = start + pagination.value.pageSize
+        return publisherFullList.value.slice(start, end)
+      }
+
+      const sourceList = receiverDisplayList.value
+      if (!currentUserId.value) return sourceList
+      return sourceList.filter(item => extractReceiverId(item) === currentUserId.value)
+    })
+
+    const getRequiredQualificationTypes = item => (item?.categoryNames || [])
+      .filter(name => tradeCategoryRequirementMap.value[name])
+
+    const showQualificationTip = computed(() => (
+      activeOrderRole.value === 'receiver'
+      && visibleOrderList.value.some(item => getRequiredQualificationTypes(item).length > 0)
+    ))
+
+    const emptyDescription = computed(() => (
+      activeOrderRole.value === 'publisher'
+        ? '暂无我发布的订单'
+        : '暂无我接取的订单'
+    ))
+
+    const getDisplayOrderStatus = item => {
+      if (!item) return ''
+
+      if (item.__recordType === 'publish') {
+        if (item.status === 'published') return 'published'
+        if (item.status === 'trading') return 'progress'
+        if (item.status === 'completed') return 'success'
+        if (item.status === 'cancel') return 'cancel'
+      }
+
+      const normalizedStatus = normalizeOrderStatus(item.status)
+      const normalizedPayStatus = normalizePayStatus(item.payStatus)
+      if (normalizedStatus === 'success' && (normalizedPayStatus || 'unpaid') === 'unpaid') {
+        return 'pay_pending'
+      }
+
+      return normalizedStatus
+    }
 
     const displayOrderStats = computed(() => visibleOrderList.value.reduce((stats, item) => {
       const displayStatus = getDisplayOrderStatus(item)
       stats.totalCount += 1
 
-      if (displayStatus === 'pending') {
+      if (displayStatus === 'pending' || displayStatus === 'published') {
         stats.pendingCount += 1
       } else if (displayStatus === 'progress' || displayStatus === 'confirm_pending') {
         stats.progressCount += 1
@@ -351,63 +568,105 @@ export default {
     const refreshQualificationStatus = async () => {
       if (authStore.hasPermission('qualification:review')) {
         qualificationChecked.value = true
-        qualificationApproved.value = true
         qualificationRecord.value = null
         return
       }
 
       const result = await fetchCurrentQualificationSafe()
       qualificationChecked.value = true
-      qualificationApproved.value = !!result.approved
       qualificationRecord.value = result.record || null
     }
 
-    const ensureQualificationApproved = async () => {
-      if (!qualificationChecked.value) {
-        await refreshQualificationStatus()
-      }
-
-      if (canTakeOrders.value) return true
-
-      ElMessage.warning('请先完成并通过资格认证后再接单')
-      router.push(resolveQualificationRedirectPath(qualificationRecord.value))
-      return false
-    }
-
-    const isReceiver = item => currentUserId.value && extractOrderUserId(item?.receiver) === currentUserId.value
-    const isPublisher = item => currentUserId.value && extractOrderUserId(item?.publisher) === currentUserId.value
-
-    const getRequiredQualificationTypes = item => (item?.categoryNames || []).filter(name => tradeCategoryRequirementMap.value[name])
-
-    const canReceive = item => {
-      if (!(item?.status === 'pending' && activeOrderRole.value === 'receiver')) return false
+    const hasRequiredQualification = item => {
       const requiredTypes = getRequiredQualificationTypes(item)
       if (!requiredTypes.length) return true
       if (authStore.hasPermission('qualification:review')) return true
       return requiredTypes.some(type => approvedQualificationTypes.value.includes(type))
     }
 
-    const getQualificationWarning = item => {
+    const ensureQualificationApproved = async item => {
+      if (!qualificationChecked.value) {
+        await refreshQualificationStatus()
+      }
+
       const requiredTypes = getRequiredQualificationTypes(item)
-      if (!requiredTypes.length || canReceive(item)) return ''
-      return `????????????????${requiredTypes.join(' / ')}`
+      if (!requiredTypes.length) return true
+      if (hasRequiredQualification(item)) return true
+
+      ElMessage.warning(`请先完成并通过以下任一资格认证后再接单：${requiredTypes.join(' / ')}`)
+      router.push(resolveQualificationRedirectPath(qualificationRecord.value))
+      return false
     }
-    const canComplete = item => item?.status === 'progress' && isReceiver(item)
-    const canConfirm = item => item?.status === 'confirm_pending' && isPublisher(item)
+
+    const isReceiver = item => currentUserId.value && extractReceiverId(item) === currentUserId.value
+    const isPublisher = item => currentUserId.value && extractPublisherId(item) === currentUserId.value
+
+    const canReceive = item => {
+      if (item?.__recordType !== 'order') return false
+      if (activeOrderRole.value !== 'receiver') return false
+      return getDisplayOrderStatus(item) === 'pending' && hasRequiredQualification(item)
+    }
+
+    const getQualificationWarning = item => {
+      if (item?.__recordType !== 'order') return ''
+      const requiredTypes = getRequiredQualificationTypes(item)
+      if (!requiredTypes.length || hasRequiredQualification(item)) return ''
+      return `该订单需具备以下任一已通过认证：${requiredTypes.join(' / ')}`
+    }
+
+    const canComplete = item => item?.__recordType === 'order' && getDisplayOrderStatus(item) === 'progress' && isReceiver(item)
+    const canConfirm = item => item?.__recordType === 'order' && getDisplayOrderStatus(item) === 'confirm_pending' && isPublisher(item)
 
     const canCancel = item => {
-      if (!currentUserId.value) return false
-      const canCancelStatus = item?.status === 'pending' || item?.status === 'progress' || item?.status === 'confirm_pending'
-      return canCancelStatus && isReceiver(item)
+      if (item?.__recordType !== 'order') return false
+      if (!currentUserId.value || !isReceiver(item)) return false
+      const displayStatus = getDisplayOrderStatus(item)
+      return displayStatus === 'pending' || displayStatus === 'progress' || displayStatus === 'confirm_pending'
     }
 
     const canPay = item => {
-      if (!currentUserId.value) return false
-      return isPublisher(item) && getDisplayOrderStatus(item) === 'pay_pending'
+      if (item?.__recordType !== 'order') return false
+      return !!currentUserId.value && isPublisher(item) && getDisplayOrderStatus(item) === 'pay_pending'
     }
+
+    const canContact = item => item?.__recordType === 'order'
 
     const syncRoleByRoute = path => {
       activeOrderRole.value = resolveOrderRoleByPath(path)
+    }
+
+    const fetchPublisherTrades = async () => {
+      const pageData = await getTradePublishPage({
+        publisherId: currentUserId.value,
+        pageNum: 1,
+        pageSize: 1000
+      })
+
+      publishTradeList.value = Array.isArray(pageData?.records) ? pageData.records : []
+      pagination.value.total = publisherFullList.value.length
+    }
+
+    const fetchPublisherOrders = async () => {
+      const pageData = await getTradeOrderPage({
+        pageNum: 1,
+        pageSize: 1000
+      })
+
+      const records = Array.isArray(pageData?.records) ? pageData.records : []
+      publisherOrderList.value = records.filter(item => extractPublisherId(item) === currentUserId.value)
+    }
+
+    const fetchRoleData = async () => {
+      if (activeOrderRole.value === 'publisher') {
+        await Promise.all([
+          fetchPublisherTrades(),
+          fetchPublisherOrders()
+        ])
+        pagination.value.total = publisherFullList.value.length
+        return
+      }
+
+      await store.fetchData()
     }
 
     const handleRoleChange = async role => {
@@ -417,7 +676,8 @@ export default {
       }
 
       try {
-        await store.setCurrentPage(1)
+        pagination.value.currentPage = 1
+        await fetchRoleData()
       } catch (error) {
         console.error('Switch order role failed:', error)
       }
@@ -425,6 +685,12 @@ export default {
 
     const handleViewDetail = async item => {
       try {
+        if (item?.__recordType === 'publish') {
+          currentPublishTrade.value = await getTradePublishDetail(item.id)
+          publishTradeDetailVisible.value = true
+          return
+        }
+
         await store.openDetail(item.id)
       } catch (error) {
         console.error('Open order detail failed:', error)
@@ -433,11 +699,11 @@ export default {
 
     const handleReceive = async item => {
       try {
-        const allowed = await ensureQualificationApproved()
+        const allowed = await ensureQualificationApproved(item)
         if (!allowed) return
 
         if (!canReceive(item)) {
-          ElMessage.warning(getQualificationWarning(item) || '??????????')
+          ElMessage.warning(getQualificationWarning(item) || '当前订单暂不允许确认接单')
           return
         }
 
@@ -476,7 +742,7 @@ export default {
     }
 
     const handleCancel = async item => {
-      const actionText = item?.status === 'pending' ? '退单' : '取消订单'
+      const actionText = getDisplayOrderStatus(item) === 'pending' ? '退单' : '取消订单'
 
       try {
         await ElMessageBox.confirm(`确定要${actionText}“${item.orderNo}”吗？`, '提示', {
@@ -514,7 +780,9 @@ export default {
 
     const handleSizeChange = async val => {
       try {
-        await store.setPageSize(val)
+        pagination.value.pageSize = val
+        pagination.value.currentPage = 1
+        await fetchRoleData()
       } catch (error) {
         console.error('Change order page size failed:', error)
       }
@@ -522,30 +790,27 @@ export default {
 
     const handleCurrentChange = async val => {
       try {
-        await store.setCurrentPage(val)
+        pagination.value.currentPage = val
+        await fetchRoleData()
       } catch (error) {
         console.error('Change order page failed:', error)
       }
     }
 
     const formatPrice = price => formatCurrency(price, { withSymbol: false })
-
-    const getDisplayOrderStatus = item => {
-      if (!item) return ''
-      if (item.status === 'success' && (item.payStatus || 'unpaid') === 'unpaid') {
-        return 'pay_pending'
-      }
-      return item.status
-    }
-
     const getStatusType = status => getOrderStatusType(status)
     const getStatusText = status => getOrderStatusText(status)
     const isActionLoading = (id, type) => store.isActionLoading(id, type)
 
     watch(
       () => route.path,
-      path => {
+      async path => {
         syncRoleByRoute(path)
+        try {
+          await fetchRoleData()
+        } catch (error) {
+          console.error('Sync order role data failed:', error)
+        }
       }
     )
 
@@ -554,7 +819,7 @@ export default {
 
       try {
         await Promise.all([
-          store.fetchData(),
+          fetchRoleData(),
           refreshQualificationStatus(),
           loadTradeCategoryOptions()
         ])
@@ -565,13 +830,17 @@ export default {
 
     onUnmounted(() => {
       store.resetTransientState()
+      publisherOrderList.value = []
+      publishTradeList.value = []
+      publishTradeDetailVisible.value = false
+      currentPublishTrade.value = null
     })
 
     return {
       loading,
       roleOptions,
       activeOrderRole,
-      canTakeOrders,
+      showQualificationTip,
       pageTitle,
       pageSubtitle,
       visibleOrderList,
@@ -580,12 +849,15 @@ export default {
       pagination,
       detailVisible,
       currentOrder,
+      publishTradeDetailVisible,
+      currentPublishTrade,
       canReceive,
-      getQualificationWarning,
       canComplete,
       canConfirm,
       canPay,
       canCancel,
+      canContact,
+      getQualificationWarning,
       handleRoleChange,
       handleViewDetail,
       handleReceive,

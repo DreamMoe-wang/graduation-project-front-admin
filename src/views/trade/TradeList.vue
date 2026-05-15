@@ -19,9 +19,9 @@
           >
             <el-option
               v-for="item in tradeCategoryOptions"
-              :key="item"
-              :label="item"
-              :value="item"
+              :key="item.categoryName"
+              :label="item.categoryName"
+              :value="item.categoryName"
             />
           </el-select>
         </el-form-item>
@@ -87,8 +87,8 @@
         </div>
       </div>
 
-      <div v-if="!canTakeOrders" class="qualification-tip">
-        接单前需要先完成并通过“资格认证”。
+      <div v-if="showQualificationTip" class="qualification-tip">
+        仅命中需认证标签的交易，在接取前才需要通过对应资格认证。
       </div>
 
       <div class="card-grid" v-loading="loading">
@@ -131,18 +131,18 @@
                 <span class="label">说明：</span>
                 <span class="value desc">{{ item.description || '无' }}</span>
               </div>
-              <div v-if="getQualificationWarning(item)" class="qualification-item-tip">{{ getQualificationWarning(item) }}</div>
+              <div v-if="getQualificationWarning(item)" class="qualification-item-tip">
+                {{ getQualificationWarning(item) }}
+              </div>
             </div>
 
             <div class="card-footer">
               <div class="amount">
                 <span class="label">交易金额：</span>
-                <span class="price">¥{{ formatAmount(item.amount) }}</span>
+                <span class="price">￥{{ formatAmount(item.amount) }}</span>
               </div>
               <div class="actions">
-                <el-button type="primary" size="small" @click="handleViewDetail(item)">
-                  详情
-                </el-button>
+                <el-button type="primary" size="small" @click="handleViewDetail(item)">详情</el-button>
                 <el-button
                   v-permission="['chat:contact', 'chat:view']"
                   type="success"
@@ -211,7 +211,7 @@
         <el-descriptions-item label="接单人">{{ currentRow.workerName || '暂无' }}</el-descriptions-item>
         <el-descriptions-item label="接单电话">{{ currentRow.workerPhone || '暂无' }}</el-descriptions-item>
         <el-descriptions-item label="交易金额">
-          <span class="amount-red">¥{{ formatAmount(currentRow.amount) }}</span>
+          <span class="amount-red">￥{{ formatAmount(currentRow.amount) }}</span>
         </el-descriptions-item>
         <el-descriptions-item label="位置" :span="2">
           {{ currentRow.location || '未填写' }}
@@ -269,25 +269,34 @@ export default {
     const router = useRouter()
     const { searchForm, tableData, loading, pagination, detailVisible, currentRow } = storeToRefs(store)
     const qualificationChecked = ref(false)
-    const qualificationApproved = ref(false)
     const qualificationRecord = ref(null)
     const tradeCategoryOptions = ref([])
+    const currentProfile = ref(null)
+
     const tradeCategoryRequirementMap = computed(() => tradeCategoryOptions.value.reduce((acc, item) => {
       if (item?.categoryName) {
         acc[item.categoryName] = !!item.requiresQualification
       }
       return acc
     }, {}))
-    const currentProfile = ref(null)
 
-    const canTakeOrders = computed(() => authStore.hasPermission('qualification:review') || qualificationApproved.value)
-    const approvedQualificationTypes = computed(() => Array.isArray(qualificationRecord.value?.approvedQualificationTypes) ? qualificationRecord.value.approvedQualificationTypes : [])
+    const approvedQualificationTypes = computed(() => (
+      Array.isArray(qualificationRecord.value?.approvedQualificationTypes)
+        ? qualificationRecord.value.approvedQualificationTypes
+        : []
+    ))
 
-    const tradeStatusOptions = [
-      { label: '发布中', value: 'published' },
-      { label: '全部', value: 'all' },
-      { label: '已完成', value: 'completed' }
-    ]
+    const tradeStatusOptions = computed(() => (
+      authStore.hasPermission('trade:review')
+        ? [
+            { label: '发布中', value: 'published' },
+            { label: '全部', value: 'all' },
+            { label: '已完成', value: 'completed' }
+          ]
+        : [
+            { label: '发布中', value: 'published' }
+          ]
+    ))
 
     const loadCurrentProfile = async () => {
       try {
@@ -311,30 +320,59 @@ export default {
     const refreshQualificationStatus = async () => {
       if (authStore.hasPermission('qualification:review')) {
         qualificationChecked.value = true
-        qualificationApproved.value = true
         qualificationRecord.value = null
         return
       }
 
       const result = await fetchCurrentQualificationSafe()
       qualificationChecked.value = true
-      qualificationApproved.value = !!result.approved
       qualificationRecord.value = result.record || null
     }
 
-    const ensureQualificationApproved = async () => {
+    const getRequiredQualificationTypes = item => (item?.categoryNames || [])
+      .filter(name => tradeCategoryRequirementMap.value[name])
+
+    const hasRequiredQualification = item => {
+      const requiredTypes = getRequiredQualificationTypes(item)
+      if (!requiredTypes.length) {
+        return true
+      }
+      if (authStore.hasPermission('qualification:review')) {
+        return true
+      }
+      return requiredTypes.some(type => approvedQualificationTypes.value.includes(type))
+    }
+
+    const ensureQualificationApproved = async item => {
       if (!qualificationChecked.value) {
         await refreshQualificationStatus()
       }
 
-      if (canTakeOrders.value) {
+      const requiredTypes = getRequiredQualificationTypes(item)
+      if (!requiredTypes.length) {
         return true
       }
 
-      ElMessage.warning('请先完成并通过资格认证后再接单')
+      if (hasRequiredQualification(item)) {
+        return true
+      }
+
+      ElMessage.warning(`请先完成并通过以下任一资格认证后再接单：${requiredTypes.join(' / ')}`)
       router.push(resolveQualificationRedirectPath(qualificationRecord.value))
       return false
     }
+
+    const canReceiveItem = item => hasRequiredQualification(item)
+
+    const getQualificationWarning = item => {
+      const requiredTypes = getRequiredQualificationTypes(item)
+      if (!requiredTypes.length || hasRequiredQualification(item)) {
+        return ''
+      }
+      return `该交易需具备以下任一已通过认证：${requiredTypes.join(' / ')}`
+    }
+
+    const showQualificationTip = computed(() => tableData.value.some(item => getRequiredQualificationTypes(item).length > 0))
 
     const handleSearch = async () => {
       try {
@@ -372,10 +410,10 @@ export default {
 
     const handleReceive = async row => {
       try {
-        const allowed = await ensureQualificationApproved()
+        const allowed = await ensureQualificationApproved(row)
         if (!allowed || !canReceiveItem(row)) {
           if (allowed) {
-            ElMessage.warning(getQualificationWarning(row) || '??????????')
+            ElMessage.warning(getQualificationWarning(row) || '请先完成对应资格认证')
           }
           return
         }
@@ -442,6 +480,7 @@ export default {
     const formatAmount = amount => formatCurrency(amount, { withSymbol: false })
     const getStatusType = status => getTradeStatusType(status)
     const getStatusText = status => getTradeStatusText(status)
+
     const distanceText = item => {
       const userLng = Number(currentProfile.value?.longitude)
       const userLat = Number(currentProfile.value?.latitude)
@@ -504,7 +543,7 @@ export default {
       pagination,
       detailVisible,
       currentRow,
-      canTakeOrders,
+      showQualificationTip,
       tradeCategoryOptions,
       canReceiveItem,
       getQualificationWarning,
